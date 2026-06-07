@@ -14,27 +14,31 @@ import java.util.List;
 
 
 /**
- * 文档加载器
+ * 文档加载器。从 classpath:document/*.md 加载预置知识。
+ *
+ * 当前默认加载样例：恋爱常见问题（保留作示例素材，可随时替换为业务文档）。
  */
 @Component
 @Slf4j
-public class LoveAppDocumentLoader {
+public class AssistantAppDocumentLoader {
 
     private final ResourcePatternResolver resourcePatternResolver;
 
-    public LoveAppDocumentLoader(ResourcePatternResolver resourcePatternResolver) {
+    public AssistantAppDocumentLoader(ResourcePatternResolver resourcePatternResolver) {
         this.resourcePatternResolver = resourcePatternResolver;
     }
 
     public List<Document> loadMarkdowns() {
         List<Document> allDocuments = new ArrayList<>();
-        // 加载多篇Markdown文件
         try {
-            Resource[] resources = resourcePatternResolver.getResources("classpath:document/恋爱常见问题和回答 - 已婚篇.md");
+            Resource[] resources = resourcePatternResolver.getResources("classpath:document/*.md");
             for (Resource resource : resources) {
                 String filename = resource.getFilename();
-                // 提取文档倒数第 3 和第 2 个字作为标签
-                String status = filename.substring(filename.length() - 6, filename.length() - 4);
+                if (filename == null) continue;
+                // 兼容历史命名：提取文件名倒数第 3、第 2 个字符作为状态标签
+                String status = filename.length() >= 7
+                        ? filename.substring(filename.length() - 6, filename.length() - 4)
+                        : "default";
                 MarkdownDocumentReaderConfig config = MarkdownDocumentReaderConfig.builder()
                         .withHorizontalRuleCreateDocument(true)
                         .withIncludeCodeBlock(false)

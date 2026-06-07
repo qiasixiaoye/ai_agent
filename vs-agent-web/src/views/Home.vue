@@ -10,18 +10,18 @@
     <div class="matrix-bg"></div>
     
     <div class="card-grid">
-      <router-link to="/love-app" class="cyber-card love-card slide-in-left">
+      <router-link to="/assistant-app" class="cyber-card assistant-card slide-in-left">
         <div class="card-content">
-          <div class="card-icon">❤️</div>
+          <div class="card-icon">🤖</div>
           <div class="card-header">
-            <div class="card-title">AI 情感大师</div>
+            <div class="card-title">AI 助手</div>
             <div class="card-tag">v1.0.0</div>
           </div>
           <div class="card-description">
-            <code>解析情感密码，探索心灵奥秘</code>
+            <code>通用对话 + RAG + 工具调用 + MCP</code>
           </div>
           <div class="card-action">
-            <span class="action-text">$ run emotion_analyzer.exe</span>
+            <span class="action-text">$ run assistant.exe</span>
             <span class="action-arrow">⟩</span>
           </div>
         </div>
@@ -39,6 +39,40 @@
           </div>
           <div class="card-action">
             <span class="action-text">$ run quantum_brain.exe</span>
+            <span class="action-arrow">⟩</span>
+          </div>
+        </div>
+      </router-link>
+
+      <router-link to="/skills" class="cyber-card skill-card slide-in-right">
+        <div class="card-content">
+          <div class="card-icon">🧩</div>
+          <div class="card-header">
+            <div class="card-title">Skill 平台</div>
+            <div class="card-tag">v1.0.0</div>
+          </div>
+          <div class="card-description">
+            <code>列出 / 查看 / 直接执行已注册 Skill</code>
+          </div>
+          <div class="card-action">
+            <span class="action-text">$ run skill_console.exe</span>
+            <span class="action-arrow">⟩</span>
+          </div>
+        </div>
+      </router-link>
+
+      <router-link to="/observability" class="cyber-card obs-card slide-in-right">
+        <div class="card-content">
+          <div class="card-icon">📈</div>
+          <div class="card-header">
+            <div class="card-title">执行日志面板</div>
+            <div class="card-tag">v1.0.0</div>
+          </div>
+          <div class="card-description">
+            <code>链路追踪、会话历史、失败排查</code>
+          </div>
+          <div class="card-action">
+            <span class="action-text">$ run observability_console.exe</span>
             <span class="action-arrow">⟩</span>
           </div>
         </div>
@@ -63,17 +97,17 @@ import { useHead } from '@vueuse/head';
 useHead({
   title: 'AI Agent Platform - 专业AI对话与智能助手服务',
   meta: [
-    { name: 'description', content: 'AI Agent Platform提供专业的AI对话服务，包含AI情感大师和AI超级智能体，满足情感咨询、知识问答等多种需求，让AI成为你的私人智能助手' },
-    { name: 'keywords', content: 'AI对话,人工智能,情感分析,AI助手,智能体,RAG,AI情感大师,AI超级智能体,AI平台,智能问答,情感咨询' },
+    { name: 'description', content: 'AI Agent Platform提供通用 AI 助手与 ReAct 超级智能体，覆盖对话、RAG、工具调用、MCP、知识库管理、链路追踪等能力' },
+    { name: 'keywords', content: 'AI对话,人工智能,AI助手,Spring AI,智能体,RAG,知识库,工具调用,MCP,ReAct,可观测性,AI平台,智能问答' },
     { property: 'og:title', content: 'AI Agent Platform - 专业AI对话与智能助手服务' },
-    { property: 'og:description', content: '探索AI情感大师与超级智能体，体验前沿AI对话技术，获取专业情感分析与知识问答服务' },
+    { property: 'og:description', content: '基于 Spring AI 的通用 AI 应用平台，包含 AI 助手、Manus 超级智能体、可观测性面板' },
     { property: 'og:type', content: 'website' },
     { property: 'og:url', content: window.location.origin },
     { property: 'og:site_name', content: 'AI Agent Platform' },
     { property: 'og:locale', content: 'zh_CN' },
     { name: 'twitter:card', content: 'summary_large_image' },
     { name: 'twitter:title', content: 'AI Agent Platform - 专业AI对话与智能助手服务' },
-    { name: 'twitter:description', content: '探索AI情感大师与超级智能体，体验前沿AI对话技术，获取专业情感分析与知识问答服务' },
+    { name: 'twitter:description', content: '基于 Spring AI 的通用 AI 应用平台，包含 AI 助手、Manus 超级智能体、可观测性面板' },
     { name: 'robots', content: 'index, follow' },
     { name: 'canonical', content: window.location.origin }
   ],
@@ -85,7 +119,7 @@ useHead({
         "@type": "WebSite",
         "name": "AI Agent Platform",
         "url": window.location.origin,
-        "description": "专业AI对话与智能助手服务平台，提供情感分析和知识问答解决方案",
+        "description": "基于 Spring AI 的通用 AI 应用平台，提供对话、RAG、工具调用、ReAct 智能体等能力",
         "potentialAction": {
           "@type": "SearchAction",
           "target": `${window.location.origin}/search?q={search_term_string}`,
@@ -196,6 +230,27 @@ onMounted(() => {
   animation: slideInRight 1s ease forwards 1s;
   opacity: 0;
 }
+
+.obs-card {
+  animation-delay: 1.2s;
+}
+
+.skill-card {
+  animation-delay: 1.1s;
+}
+
+.skill-card:hover {
+  border-color: rgba(255, 200, 80, 0.6);
+  box-shadow: 0 10px 20px rgba(255, 200, 80, 0.3), inset 0 0 20px rgba(255, 200, 80, 0.2);
+}
+
+.skill-card .card-tag {
+  background-color: rgba(255, 200, 80, 0.2);
+  color: #ffc850;
+}
+
+.skill-card .card-action { border-left-color: #ffc850; }
+.skill-card .action-arrow { color: #ffc850; }
 
 .slide-in-bottom {
   animation: slideInBottom 1s ease forwards 1.5s;
@@ -410,7 +465,7 @@ onMounted(() => {
   box-shadow: 0 10px 20px rgba(51, 255, 0, 0.3), inset 0 0 20px rgba(51, 255, 0, 0.2);
 }
 
-.love-card:hover {
+.assistant-card:hover {
   border-color: rgba(255, 107, 129, 0.6);
   box-shadow: 0 10px 20px rgba(255, 107, 129, 0.3), inset 0 0 20px rgba(255, 107, 129, 0.2);
 }
@@ -448,7 +503,7 @@ onMounted(() => {
   border-radius: 4px;
 }
 
-.love-card .card-tag {
+.assistant-card .card-tag {
   background-color: rgba(255, 107, 129, 0.2);
   color: #ff6b81;
 }
@@ -480,7 +535,7 @@ onMounted(() => {
   align-items: center;
 }
 
-.love-card .card-action {
+.assistant-card .card-action {
   border-left-color: #ff6b81;
 }
 
@@ -500,68 +555,4 @@ onMounted(() => {
   transition: transform 0.2s;
 }
 
-.love-card .action-arrow {
-  color: #ff6b81;
-}
-
-.manus-card .action-arrow {
-  color: #4a6fa5;
-}
-
-.cyber-card:hover .action-arrow {
-  transform: translateX(5px);
-}
-
-.cyber-footer {
-  width: 100%;
-  text-align: center;
-  padding: 2rem;
-  position: relative;
-  z-index: 10;
-  margin-top: 2rem;
-  box-sizing: border-box;
-}
-
-.terminal-line {
-  display: inline-block;
-  background-color: rgba(0, 0, 0, 0.7);
-  padding: 0.75rem 1rem;
-  border-radius: 4px;
-  border: 1px solid rgba(51, 255, 0, 0.3);
-}
-
-.terminal-prompt {
-  color: #33ff00;
-  margin-right: 0.5rem;
-}
-
-.terminal-command {
-  color: #ffffff;
-}
-
-.terminal-cursor {
-  display: inline-block;
-  width: 8px;
-  height: 1rem;
-  background-color: #33ff00;
-  margin-left: 0.25rem;
-  vertical-align: middle;
-  animation: blink 1s step-end infinite;
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
-}
-
-/* 响应式调整 */
-@media (max-width: 768px) {
-  .glitch-text {
-    font-size: 2rem;
-  }
-  
-  .card-grid {
-    grid-template-columns: 1fr;
-  }
-}
-</style> 
+.assistant

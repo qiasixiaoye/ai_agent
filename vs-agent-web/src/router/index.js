@@ -7,20 +7,21 @@ const routes = [
     component: () => import('../views/Home.vue')
   },
   {
-    path: '/love-app',
-    name: 'LoveApp',
-    component: () => import('../views/LoveApp.vue')
+    path: '/assistant-app',
+    name: 'AssistantApp',
+    component: () => import('../views/AssistantApp.vue')
   },
   {
     path: '/manus-app',
     name: 'ManusApp',
     component: () => import('../views/ManusApp.vue')
-  }
-]
-
-const router = createRouter({
-  history: createWebHistory(),
-  routes
-})
-
-export default router 
+  },
+  {
+    path: '/observability',
+    name: 'Observability',
+    component: () => import('../views/Observability.vue')
+  },
+  {
+    path: '/skills',
+    name: 'Skills',
+    component: () => import('../views/S

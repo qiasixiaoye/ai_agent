@@ -9,32 +9,30 @@ import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 
 /**
- * 创建自定义的 RAG 检索增强顾问的工厂
+ * 创建自定义的 RAG 检索增强顾问的工厂。
  */
-public class LoveAppRagCustomAdvisorFactory {
+public class AssistantAppRagCustomAdvisorFactory {
 
     /**
-     * 创建自定义的 RAG 检索增强顾问
+     * 创建自定义 RAG 检索增强顾问。
      *
      * @param vectorStore 向量存储
-     * @param status      状态
-     * @return 自定义的 RAG 检索增强顾问
+     * @param status      用于过滤的状态标签
+     * @return 检索增强顾问
      */
-    public static Advisor createLoveAppRagCustomAdvisor(VectorStore vectorStore, String status) {
-        // 过滤特定状态的文档
+    public static Advisor createAssistantAppRagCustomAdvisor(VectorStore vectorStore, String status) {
         Filter.Expression expression = new FilterExpressionBuilder()
                 .eq("status", status)
                 .build();
-        // 创建文档检索器
         DocumentRetriever documentRetriever = VectorStoreDocumentRetriever.builder()
                 .vectorStore(vectorStore)
-                .filterExpression(expression) // 过滤条件
-                .similarityThreshold(0.5) // 相似度阈值
-                .topK(3) // 返回文档数量
+                .filterExpression(expression)
+                .similarityThreshold(0.5)
+                .topK(3)
                 .build();
         return RetrievalAugmentationAdvisor.builder()
                 .documentRetriever(documentRetriever)
-                .queryAugmenter(LoveAppContextualQueryAugmenterFactory.createInstance())
+                .queryAugmenter(AssistantAppContextualQueryAugmenterFactory.createInstance())
                 .build();
     }
 }
