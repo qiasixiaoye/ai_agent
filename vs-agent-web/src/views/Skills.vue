@@ -98,7 +98,16 @@
               <div v-if="!result.success" class="result-fail">
                 <strong>错误：</strong>{{ result.errorMessage }}
               </div>
-              <pre v-else class="result-data">{{ JSON.stringify(result.data, null, 2) }}</pre>
+              <template v-else>
+                <!-- 文件产物：自动检测 filePath 并提供下载/复制路径 -->
+                <div v-if="filePath" class="file-output">
+                  <span class="file-label">📄 生成文件</span>
+                  <code class="file-path">{{ filePath }}</code>
+                  <a class="file-action download" :href="downloadHref" target="_blank">下载</a>
+                  <button class="file-action copy" @click="copyPath">{{ copied ? '已复制' : '复制路径' }}</button>
+                </div>
+                <pre class="result-data">{{ JSON.stringify(result.data, null, 2) }}</pre>
+              </template>
             </div>
           </div>
 
@@ -116,8 +125,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { listSkills, getSkill, executeSkill } from '../services/api'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { listSkills, getSkill, executeSkill, fileDownloadUrl } from '../services/api'
 
 const skills = ref([])
 const current = ref(null)
@@ -126,6 +135,31 @@ const result = ref(null)
 const error = ref(null)
 const loadingList = ref(false)
 const executing = ref(false)
+const copied = ref(false)
+
+const filePath = computed(() => {
+  const d = result.value?.data
+  if (!d || typeof d !== 'object') return null
+  // 优先 filePath，其次任何以 Path 结尾的字段
+  if (typeof d.filePath === 'string') return d.filePath
+  for (const [k, v] of Object.entries(d)) {
+    if (typeof v === 'string' && /(^|[A-Z])(P|p)ath$/.test(k)) return v
+  }
+  return null
+})
+
+const downloadHref = computed(() => filePath.value ? fileDownloadUrl(filePath.value) : '#')
+
+const copyPath = async () => {
+  if (!filePath.value) return
+  try {
+    await navigator.clipboard.writeText(filePath.value)
+    copied.value = true
+    setTimeout(() => { copied.value = false }, 1500)
+  } catch (e) {
+    console.warn('copy failed', e)
+  }
+}
 
 const refresh = async () => {
   loadingList.value = true
@@ -354,57 +388,3 @@ onMounted(refresh)
   font-size: 12px;
   color: #8a96b3;
   margin-top: 4px;
-}
-.form-row input,
-.form-row textarea {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 8px 10px;
-  border: 1px solid #d0d7e2;
-  border-radius: 6px;
-  font-size: 14px;
-  font-family: inherit;
-}
-.form-row textarea { resize: vertical; min-height: 50px; }
-
-.actions { margin-top: 14px; text-align: right; }
-.execute-btn {
-  background: #4a6fa5;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  padding: 8px 18px;
-  font-size: 14px;
-  cursor: pointer;
-}
-.execute-btn:hover:not(:disabled) { background: #3a5a85; }
-.execute-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-.result-summary { margin-bottom: 8px; display: flex; gap: 10px; align-items: center; }
-.result-badge {
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
-}
-.result-badge.ok { background: #e0f5e0; color: #1a7a1a; }
-.result-badge.fail { background: #fde0e0; color: #b01a1a; }
-.result-elapsed { color: #8a96b3; font-size: 12px; }
-.result-fail { color: #b01a1a; font-size: 13px; }
-.result-data {
-  background: #1e1e1e;
-  color: #d4d4d4;
-  border-radius: 6px;
-  padding: 12px;
-  overflow-x: auto;
-  font-size: 12.5px;
-  line-height: 1.5;
-  max-height: 360px;
-  overflow-y: auto;
-}
-
-.examples-card ul { padding-left: 18px; margin: 0; }
-.examples-card li { margin: 4px 0; color: #4a4a4a; }
-
-.hint { color: #8a96b3; font-size: 13px; }
-</style>
