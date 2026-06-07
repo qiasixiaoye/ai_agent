@@ -44,6 +44,23 @@
         </div>
       </router-link>
 
+      <router-link to="/knowledge-base" class="cyber-card kb-card slide-in-left">
+        <div class="card-content">
+          <div class="card-icon">📚</div>
+          <div class="card-header">
+            <div class="card-title">知识库管理</div>
+            <div class="card-tag">v1.0.0</div>
+          </div>
+          <div class="card-description">
+            <code>上传 / 解析 / 切块 / 向量化 / 重建索引</code>
+          </div>
+          <div class="card-action">
+            <span class="action-text">$ run kb_console.exe</span>
+            <span class="action-arrow">⟩</span>
+          </div>
+        </div>
+      </router-link>
+
       <router-link to="/skills" class="cyber-card skill-card slide-in-right">
         <div class="card-content">
           <div class="card-icon">🧩</div>
@@ -234,6 +251,23 @@ onMounted(() => {
 .obs-card {
   animation-delay: 1.2s;
 }
+
+.kb-card {
+  animation-delay: 1.0s;
+}
+
+.kb-card:hover {
+  border-color: rgba(47, 138, 76, 0.6);
+  box-shadow: 0 10px 20px rgba(47, 138, 76, 0.3), inset 0 0 20px rgba(47, 138, 76, 0.2);
+}
+
+.kb-card .card-tag {
+  background-color: rgba(47, 138, 76, 0.2);
+  color: #2f8a4c;
+}
+
+.kb-card .card-action { border-left-color: #2f8a4c; }
+.kb-card .action-arrow { color: #2f8a4c; }
 
 .skill-card {
   animation-delay: 1.1s;
@@ -492,67 +526,4 @@ onMounted(() => {
 .card-title {
   font-size: 1.5rem;
   font-weight: bold;
-  color: #ffffff;
-}
-
-.card-tag {
-  font-size: 0.8rem;
-  background-color: rgba(51, 255, 0, 0.2);
-  color: #33ff00;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-}
-
-.assistant-card .card-tag {
-  background-color: rgba(255, 107, 129, 0.2);
-  color: #ff6b81;
-}
-
-.manus-card .card-tag {
-  background-color: rgba(74, 111, 165, 0.2);
-  color: #4a6fa5;
-}
-
-.card-description {
-  flex-grow: 1;
-  margin-bottom: 1.5rem;
-}
-
-.card-description code {
-  color: #cccccc;
-  font-size: 0.9rem;
-  display: block;
-  line-height: 1.4;
-}
-
-.card-action {
-  background-color: rgba(0, 0, 0, 0.5);
-  padding: 0.75rem 1rem;
-  border-radius: 4px;
-  border-left: 3px solid #33ff00;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.assistant-card .card-action {
-  border-left-color: #ff6b81;
-}
-
-.manus-card .card-action {
-  border-left-color: #4a6fa5;
-}
-
-.action-text {
-  color: #bbbbbb;
-  font-size: 0.85rem;
-}
-
-.action-arrow {
-  color: #33ff00;
-  font-size: 1.2rem;
-  font-weight: bold;
-  transition: transform 0.2s;
-}
-
-.assistant
+  
