@@ -24,4 +24,18 @@ const routes = [
   {
     path: '/skills',
     name: 'Skills',
-    component: () => import('../views/S
+    component: () => import('../views/Skills.vue')
+  },
+  {
+    path: '/knowledge-base',
+    name: 'KnowledgeBase',
+    component: () => import('../views/KnowledgeBase.vue')
+  }
+]
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes
+})
+
+export default router

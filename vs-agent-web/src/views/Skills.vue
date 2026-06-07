@@ -7,7 +7,6 @@
     </div>
 
     <div class="skills-body">
-      <!-- 左侧：Skill 列表 -->
       <aside class="skills-list">
         <div class="list-title">已注册 Skill ({{ skills.length }})</div>
         <div v-if="loadingList" class="hint">加载中...</div>
@@ -30,7 +29,6 @@
         </ul>
       </aside>
 
-      <!-- 右侧：详情 + 执行 -->
       <section class="skills-detail">
         <div v-if="!current" class="empty">
           <div class="empty-icon">🧩</div>
@@ -50,7 +48,6 @@
             </div>
           </div>
 
-          <!-- 输入参数表单 -->
           <div class="form-card">
             <div class="card-title">输入参数</div>
             <div v-if="!current.inputs || current.inputs.length === 0" class="hint">此 Skill 不需要参数。</div>
@@ -82,7 +79,6 @@
             </div>
           </div>
 
-          <!-- 执行结果 -->
           <div class="result-card" v-if="result || error">
             <div class="card-title">执行结果</div>
             <div v-if="error" class="result-fail">
@@ -99,7 +95,6 @@
                 <strong>错误：</strong>{{ result.errorMessage }}
               </div>
               <template v-else>
-                <!-- 文件产物：自动检测 filePath 并提供下载/复制路径 -->
                 <div v-if="filePath" class="file-output">
                   <span class="file-label">📄 生成文件</span>
                   <code class="file-path">{{ filePath }}</code>
@@ -111,7 +106,6 @@
             </div>
           </div>
 
-          <!-- 示例 -->
           <div class="examples-card" v-if="current.examples && current.examples.length > 0">
             <div class="card-title">调用示例</div>
             <ul>
@@ -140,7 +134,6 @@ const copied = ref(false)
 const filePath = computed(() => {
   const d = result.value?.data
   if (!d || typeof d !== 'object') return null
-  // 优先 filePath，其次任何以 Path 结尾的字段
   if (typeof d.filePath === 'string') return d.filePath
   for (const [k, v] of Object.entries(d)) {
     if (typeof v === 'string' && /(^|[A-Z])(P|p)ath$/.test(k)) return v
@@ -179,7 +172,6 @@ const select = async (name) => {
   try {
     const detail = await getSkill(name)
     current.value = detail
-    // 初始化表单值
     for (const p of (detail.inputs || [])) {
       formData[p.name] = p.defaultValue ?? ''
     }
@@ -215,176 +207,61 @@ onMounted(refresh)
 </script>
 
 <style scoped>
-.skills-container {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  background-color: #f5f7fb;
-  color: #222;
-}
-
-.skills-header {
-  display: flex;
-  align-items: center;
-  padding: 12px 20px;
-  background-color: #4a6fa5;
-  color: white;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
-}
-
-.skills-header h1 {
-  margin: 0 auto;
-  font-size: 1.4rem;
-}
-
-.back-link {
-  color: white;
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-}
-
+.skills-container { display: flex; flex-direction: column; height: 100vh; background-color: #f5f7fb; color: #222; }
+.skills-header { display: flex; align-items: center; padding: 12px 20px; background-color: #4a6fa5; color: white; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08); }
+.skills-header h1 { margin: 0 auto; font-size: 1.4rem; }
+.back-link { color: white; text-decoration: none; display: flex; align-items: center; }
 .back-link span { font-size: 1.2rem; margin-right: 5px; }
-
-.reload-btn {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  border-radius: 4px;
-  padding: 4px 10px;
-  cursor: pointer;
-}
+.reload-btn { background: rgba(255, 255, 255, 0.2); color: white; border: 1px solid rgba(255, 255, 255, 0.4); border-radius: 4px; padding: 4px 10px; cursor: pointer; }
 .reload-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.skills-body {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-}
-
-.skills-list {
-  width: 320px;
-  min-width: 280px;
-  background: white;
-  border-right: 1px solid #e5e8f0;
-  overflow-y: auto;
-  padding: 12px;
-}
-
-.list-title {
-  font-weight: 600;
-  margin-bottom: 8px;
-  color: #4a6fa5;
-}
-
+.skills-body { flex: 1; display: flex; overflow: hidden; }
+.skills-list { width: 320px; min-width: 280px; background: white; border-right: 1px solid #e5e8f0; overflow-y: auto; padding: 12px; }
+.list-title { font-weight: 600; margin-bottom: 8px; color: #4a6fa5; }
 .skills-list ul { list-style: none; padding: 0; margin: 0; }
-
-.skill-item {
-  padding: 10px 12px;
-  border-radius: 6px;
-  margin-bottom: 6px;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: background 0.15s, border-color 0.15s;
-}
+.skill-item { padding: 10px 12px; border-radius: 6px; margin-bottom: 6px; cursor: pointer; border: 1px solid transparent; transition: background 0.15s, border-color 0.15s; }
 .skill-item:hover { background: #f0f4fb; }
-.skill-item.active {
-  background: #e7f0ff;
-  border-color: #4a6fa5;
-}
-
-.skill-item-title {
-  font-weight: 600;
-  color: #2a3a55;
-}
-.skill-item-desc {
-  font-size: 12px;
-  color: #6c7a99;
-  margin-top: 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-.skill-item-meta {
-  margin-top: 6px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.badge {
-  display: inline-block;
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: #e5e8f0;
-  color: #4a6fa5;
-}
+.skill-item.active { background: #e7f0ff; border-color: #4a6fa5; }
+.skill-item-title { font-weight: 600; color: #2a3a55; }
+.skill-item-desc { font-size: 12px; color: #6c7a99; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.skill-item-meta { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+.badge { display: inline-block; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #e5e8f0; color: #4a6fa5; }
 .badge.tag { background: #fff0e0; color: #b06000; }
-
-.skills-detail {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px 28px;
-}
-
-.empty {
-  text-align: center;
-  padding-top: 120px;
-  color: #8a96b3;
-}
+.skills-detail { flex: 1; overflow-y: auto; padding: 20px 28px; }
+.empty { text-align: center; padding-top: 120px; color: #8a96b3; }
 .empty-icon { font-size: 56px; }
-
 .detail-head { margin-bottom: 18px; }
 .detail-head h2 { margin: 0; }
-.skill-name-code {
-  display: inline-block;
-  background: #f0f2f7;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 13px;
-  color: #4a6fa5;
-  margin-top: 4px;
-}
+.skill-name-code { display: inline-block; background: #f0f2f7; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #4a6fa5; margin-top: 4px; }
 .detail-desc { margin: 8px 0; color: #4a4a4a; }
 .detail-meta { display: flex; gap: 6px; flex-wrap: wrap; }
-
-.form-card, .result-card, .examples-card {
-  background: white;
-  border: 1px solid #e5e8f0;
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 16px;
-}
-
-.card-title {
-  font-weight: 600;
-  margin-bottom: 12px;
-  color: #2a3a55;
-}
-
+.form-card, .result-card, .examples-card { background: white; border: 1px solid #e5e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+.card-title { font-weight: 600; margin-bottom: 12px; color: #2a3a55; }
 .form-grid { display: flex; flex-direction: column; gap: 14px; }
-.form-row label {
-  display: flex;
-  gap: 6px;
-  align-items: baseline;
-  font-size: 13px;
-  color: #444;
-  margin-bottom: 4px;
-}
+.form-row label { display: flex; gap: 6px; align-items: baseline; font-size: 13px; color: #444; margin-bottom: 4px; }
 .param-name { font-weight: 600; color: #2a3a55; }
 .param-required { color: #d33; }
-.param-type {
-  font-family: monospace;
-  font-size: 11px;
-  background: #f0f2f7;
-  padding: 1px 5px;
-  border-radius: 3px;
-  color: #4a6fa5;
-}
-.param-desc {
-  font-size: 12px;
-  color: #8a96b3;
-  margin-top: 4px;
+.param-type { font-family: monospace; font-size: 11px; background: #f0f2f7; padding: 1px 5px; border-radius: 3px; color: #4a6fa5; }
+.param-desc { font-size: 12px; color: #8a96b3; margin-top: 4px; }
+.form-row input, .form-row textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #d0d7e2; border-radius: 6px; font-size: 14px; font-family: inherit; }
+.form-row textarea { resize: vertical; min-height: 50px; }
+.actions { margin-top: 14px; text-align: right; }
+.execute-btn { background: #4a6fa5; color: white; border: none; border-radius: 6px; padding: 8px 18px; font-size: 14px; cursor: pointer; }
+.execute-btn:hover:not(:disabled) { background: #3a5a85; }
+.execute-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.result-summary { margin-bottom: 8px; display: flex; gap: 10px; align-items: center; }
+.result-badge { padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+.result-badge.ok { background: #e0f5e0; color: #1a7a1a; }
+.result-badge.fail { background: #fde0e0; color: #b01a1a; }
+.result-elapsed { color: #8a96b3; font-size: 12px; }
+.result-fail { color: #b01a1a; font-size: 13px; }
+.result-data { background: #1e1e1e; color: #d4d4d4; border-radius: 6px; padding: 12px; overflow-x: auto; font-size: 12.5px; line-height: 1.5; max-height: 360px; overflow-y: auto; }
+.examples-card ul { padding-left: 18px; margin: 0; }
+.examples-card li { margin: 4px 0; color: #4a4a4a; }
+.hint { color: #8a96b3; font-size: 13px; }
+.file-output { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: #f4f8ff; border: 1px solid #d0dcef; border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; font-size: 13px; }
+.file-label { font-weight: 600; color: #2a3a55; }
+.file-path { background: white; border: 1px solid #d8dde6; border-radius: 4px; padding: 2px 6px; font-family: monospace; font-size: 12px; word-break: break-all; max-width: 100%; }
+.file-action { text-decoration: none; border: none; background: #4a6fa5; color: white; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+.file-action.copy { background: #6c7a99; }
+.file-action:hover { opacity: 0.9; }
+</style>
