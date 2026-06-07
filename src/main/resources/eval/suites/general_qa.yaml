@@ -1,0 +1,28 @@
+name: general_qa
+description: 通用知识问答 smoke test — 检查 AssistantApp 基本能力是否健康
+runner: assistant_app
+cases:
+  - id: gen_001
+    input: 用一句话解释什么是 RAG（检索增强生成）？
+    expected_contains:
+      - 检索
+      - 生成
+    tags: [概念, RAG]
+  - id: gen_002
+    input: Java 21 引入的 record 类型有什么用？
+    expected_contains:
+      - record
+      - 不可变
+    tags: [Java]
+  - id: gen_003
+    input: Spring Boot 的 starter 是什么？
+    expected_contains:
+      - 依赖
+      - 自动配置
+    tags: [Spring]
+  - id: gen_004
+    input: 请用中文回答：HTTP 与 HTTPS 的核心区别是什么？
+    expected_contains:
+      - TLS
+      - 加密
+    tags: [网络]

@@ -118,4 +118,16 @@ export const rebuildKbIndex = async () => {
   return unwrap(response)
 }
 
+// ---------------- Eval ----------------
+
+export const listEvalSuites = async () => {
+  const response = await api.get('/eval/suites')
+  return unwrap(response)
+}
+
+export const runEvalSuite = async (suiteName) => {
+  const response = await api.post(`/eval/run/${encodeURIComponent(suiteName)}`, {}, { timeout: 600000 })
+  return unwrap(response)
+}
+
 export default api
