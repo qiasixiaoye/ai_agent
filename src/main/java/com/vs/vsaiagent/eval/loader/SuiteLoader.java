@@ -58,6 +58,7 @@ public class SuiteLoader {
             String name = str(root.get("name"));
             String desc = str(root.get("description"));
             String runner = str(root.get("runner"));
+            String judge = str(root.get("judge"));
 
             List<EvalCase> cases = new ArrayList<>();
             Object casesNode = root.get("cases");
@@ -74,7 +75,7 @@ public class SuiteLoader {
                     ));
                 }
             }
-            return new EvalSuite(name, desc, runner, cases);
+            return new EvalSuite(name, desc, runner, judge, cases);
         } catch (Exception e) {
             log.warn("[suite-loader] parse {} failed: {}", r.getFilename(), e.getMessage());
             return null;

@@ -1,0 +1,20 @@
+name: subjective_qa
+description: 主观题评测 — 用 LLM-as-Judge 按 rubric 给 AssistantApp 答案打分
+runner: assistant_app
+judge: llm_as_judge
+cases:
+  - id: subj_001
+    input: 请用你自己的话解释为什么 RAG 比纯 LLM 更适合企业知识问答场景，并指出至少一个局限。
+    rubric: 答案必须 (1) 解释 RAG 利用外部知识降低幻觉的核心原理 (2) 指出至少一个 RAG 的局限性（如检索质量瓶颈 / 上下文窗口限制 / 召回噪声等）。结构清晰即可。
+    expected_contains: [RAG, 幻觉, 局限]
+    tags: [概念, RAG, 主观]
+  - id: subj_002
+    input: 你被要求为一个 1000 万行的 PostgreSQL 表加一个 NOT NULL 的新列，并发写量很大，写一段 200 字以内的迁移方案要点。
+    rubric: 答案必须给出 (1) 不能直接加 NOT NULL 列的判断 (2) 分阶段方案（先 nullable + 默认 + 回填 + 改约束）(3) 至少提一个并发写期间的注意点（如 lock、长事务）。
+    expected_contains: [NOT NULL, 回填]
+    tags: [数据库, 主观]
+  - id: subj_003
+    input: 解释一下 ReAct Agent 的核心循环结构，并指出它和 Tool Calling 单步调用的本质区别。
+    rubric: 必须解释 ReAct 的 Thought-Action-Observation 循环，并指出 ReAct 是多步多轮、Tool Calling 单步是单轮单工具。
+    expected_contains: [ReAct, Thought, Tool Calling]
+    tags: [Agent, 主观]

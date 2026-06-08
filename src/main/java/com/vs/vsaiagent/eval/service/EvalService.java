@@ -19,6 +19,11 @@ import java.util.UUID;
 
 /**
  * Eval 编排服务：suite 选择 → runner 调用 → judge 评分 → 聚合结果。
+ *
+ * runner 和 judge 都通过 Spring 自动收集所有实现，按 name 路由：
+ *  - suite.runner() 缺省 "assistant_app"
+ *  - suite.judge()  缺省 "keyword_contains"
+ *  - 未找到 → 回退到 keyword_contains（仍找不到则抛错）
  */
 @Slf4j
 @Service
@@ -41,9 +46,11 @@ public class EvalService {
         return suiteLoader.loadAll();
     }
 
-    /**
-     * 跑一份 suite。judge 暂时固定为 keyword_contains，后续可以放开为参数。
-     */
+    /** Judges 列表（前端可用于显示哪些 judge 可用） */
+    public List<String> listJudges() {
+        return new ArrayList<>(judges.keySet());
+    }
+
     public SuiteResult run(String suiteName) {
         EvalSuite suite = suiteLoader.findByName(suiteName)
                 .orElseThrow(() -> new IllegalArgumentException("suite not found: " + suiteName));
@@ -51,10 +58,11 @@ public class EvalService {
         if (runner == null) {
             throw new IllegalStateException("runner not found: " + suite.runner());
         }
-        EvalJudge judge = judges.get(KeywordContainsJudge.NAME);
+        EvalJudge judge = judges.getOrDefault(suite.judge(), judges.get(KeywordContainsJudge.NAME));
         if (judge == null) {
-            throw new IllegalStateException("default judge missing: " + KeywordContainsJudge.NAME);
+            throw new IllegalStateException("no judge available, expected: " + suite.judge());
         }
+        log.info("[eval] run suite={} runner={} judge={}", suite.name(), runner.name(), judge.name());
 
         long startAll = System.currentTimeMillis();
         List<CaseResult> caseResults = new ArrayList<>();
