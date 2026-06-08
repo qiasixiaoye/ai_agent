@@ -8,7 +8,8 @@ const routes = [
   { path: '/skills',          name: 'Skills',        component: () => import('../views/Skills.vue') },
   { path: '/knowledge-base',  name: 'KnowledgeBase', component: () => import('../views/KnowledgeBase.vue') },
   { path: '/eval',            name: 'Eval',          component: () => import('../views/Eval.vue') },
-  { path: '/agent-platform',  name: 'AgentPlatform', component: () => import('../views/AgentPlatform.vue') }
+  { path: '/agent-platform',  name: 'AgentPlatform', component: () => import('../views/AgentPlatform.vue') },
+  { path: '/dify',            name: 'Dify',          component: () => import('../views/Dify.vue') }
 ]
 
 const router = createRouter({

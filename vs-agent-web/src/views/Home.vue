@@ -4,7 +4,7 @@
       <div class="glitch-container">
         <h1 class="glitch-text" data-text="AI AGENT PLATFORM">AI AGENT PLATFORM</h1>
       </div>
-      <p class="tagline">// AI 助手 + 智能体 + 知识库 + Skill + Agent 平台 + 评测 + 可观测性</p>
+      <p class="tagline">// 助手 + 智能体 + 知识库 + Skill + Agent 平台 + Dify + 评测 + 可观测性</p>
     </div>
 
     <div class="matrix-bg"></div>
@@ -41,7 +41,7 @@
         <div class="card-content">
           <div class="card-icon">🧩</div>
           <div class="card-header"><div class="card-title">Skill 平台</div><div class="card-tag">v1.0.0</div></div>
-          <div class="card-description"><code>列出 / 查看 / 直接执行已注册 Skill</code></div>
+          <div class="card-description"><code>SKILL.md 规范 / 列表 / 执行 / 下载</code></div>
           <div class="card-action"><span class="action-text">$ run skill_console.exe</span><span class="action-arrow">⟩</span></div>
         </div>
       </router-link>
@@ -50,16 +50,25 @@
         <div class="card-content">
           <div class="card-icon">🛠</div>
           <div class="card-header"><div class="card-title">Agent 平台</div><div class="card-tag">v1.0.0</div></div>
-          <div class="card-description"><code>工具注册中心 + 任务编排（自定义 / Demo 流）</code></div>
+          <div class="card-description"><code>工具注册中心 + 任务编排</code></div>
           <div class="card-action"><span class="action-text">$ run agent_platform.exe</span><span class="action-arrow">⟩</span></div>
         </div>
       </router-link>
 
-      <router-link to="/eval" class="cyber-card eval-card slide-in-right">
+      <router-link to="/dify" class="cyber-card dify-card slide-in-right">
+        <div class="card-content">
+          <div class="card-icon">🌐</div>
+          <div class="card-header"><div class="card-title">Dify 工作流</div><div class="card-tag">v1.0.0</div></div>
+          <div class="card-description"><code>双向集成：调 Workflow + 导出 OpenAPI</code></div>
+          <div class="card-action"><span class="action-text">$ run dify_bridge.exe</span><span class="action-arrow">⟩</span></div>
+        </div>
+      </router-link>
+
+      <router-link to="/eval" class="cyber-card eval-card slide-in-left">
         <div class="card-content">
           <div class="card-icon">📊</div>
           <div class="card-header"><div class="card-title">Eval 评测</div><div class="card-tag">v1.0.0</div></div>
-          <div class="card-description"><code>YAML 数据集 + Runner + Judge + 通过率矩阵</code></div>
+          <div class="card-description"><code>YAML suite · Runner · Keyword/LLM Judge</code></div>
           <div class="card-action"><span class="action-text">$ run eval_harness.exe</span><span class="action-arrow">⟩</span></div>
         </div>
       </router-link>
@@ -91,8 +100,8 @@ import { useHead } from '@vueuse/head';
 useHead({
   title: 'AI Agent Platform - 通用 AI 对话与智能助手服务',
   meta: [
-    { name: 'description', content: '基于 Spring AI 的通用 AI 应用平台：AI 助手、Manus 智能体、知识库、Skill 平台、Agent 平台、Eval 评测、可观测性。' },
-    { name: 'keywords', content: 'AI对话,Spring AI,智能体,RAG,知识库,工具调用,MCP,ReAct,可观测性,Eval' },
+    { name: 'description', content: '基于 Spring AI 的通用 AI 应用平台：AI 助手、Manus 智能体、知识库、Skill 平台、Agent 平台、Dify 双向集成、Eval 评测、可观测性。' },
+    { name: 'keywords', content: 'AI对话,Spring AI,智能体,RAG,知识库,工具调用,MCP,ReAct,Dify,Eval,LLM-as-Judge,可观测性' },
     { property: 'og:title', content: 'AI Agent Platform' },
     { property: 'og:description', content: '基于 Spring AI 的通用 AI 应用平台' },
     { property: 'og:type', content: 'website' },
@@ -109,18 +118,15 @@ onMounted(() => {
   const matrixBg = document.querySelector('.matrix-bg');
   if (!matrixBg) return;
   matrixBg.appendChild(canvas);
-
   const ctx = canvas.getContext('2d');
   const setCanvasSize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
   setCanvasSize();
   window.addEventListener('resize', setCanvasSize);
-
   const characters = 'asdasfasfsafsdfdsfdswqernionvmbmirteihbgn1249237589wnen';
   let columns = Math.floor(canvas.width / 20);
   let drops = Array(columns).fill(1);
   const updateColumns = () => { columns = Math.floor(canvas.width / 20); drops = Array(columns).fill(1); };
   window.addEventListener('resize', updateColumns);
-
   function drawMatrix() {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -133,9 +139,7 @@ onMounted(() => {
       drops[i]++;
     }
   }
-
   const matrixInterval = setInterval(drawMatrix, 50);
-
   onBeforeUnmount(() => {
     clearInterval(matrixInterval);
     window.removeEventListener('resize', setCanvasSize);
@@ -151,8 +155,9 @@ onMounted(() => {
 .slide-in-left { animation: slideInLeft 1s ease forwards 0.8s; opacity: 0; }
 .slide-in-right { animation: slideInRight 1s ease forwards 1s; opacity: 0; }
 .kb-card { animation-delay: 1.0s; }
-.skill-card { animation-delay: 1.1s; }
 .ap-card { animation-delay: 1.05s; }
+.skill-card { animation-delay: 1.1s; }
+.dify-card { animation-delay: 1.12s; }
 .eval-card { animation-delay: 1.15s; }
 .obs-card { animation-delay: 1.2s; }
 .slide-in-bottom { animation: slideInBottom 1s ease forwards 1.5s; opacity: 0; }
@@ -174,8 +179,9 @@ onMounted(() => {
 .manus-card:hover { border-color: rgba(155, 89, 182, 0.6); }
 .kb-card:hover { border-color: rgba(47, 138, 76, 0.6); }
 .skill-card:hover { border-color: rgba(255, 200, 80, 0.6); }
-.ap-card:hover { border-color: rgba(138, 90, 43, 0.6); box-shadow: 0 10px 20px rgba(138, 90, 43, 0.3), inset 0 0 20px rgba(138, 90, 43, 0.2); }
-.eval-card:hover { border-color: rgba(109, 74, 165, 0.6); box-shadow: 0 10px 20px rgba(109, 74, 165, 0.3), inset 0 0 20px rgba(109, 74, 165, 0.2); }
+.ap-card:hover { border-color: rgba(138, 90, 43, 0.6); }
+.dify-card:hover { border-color: rgba(31, 155, 155, 0.6); box-shadow: 0 10px 20px rgba(31, 155, 155, 0.3), inset 0 0 20px rgba(31, 155, 155, 0.2); }
+.eval-card:hover { border-color: rgba(109, 74, 165, 0.6); }
 .obs-card:hover { border-color: rgba(80, 180, 220, 0.6); }
 .card-icon { font-size: 2.5rem; margin-bottom: 1rem; display: inline-block; }
 .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
@@ -186,6 +192,7 @@ onMounted(() => {
 .kb-card .card-tag { background-color: rgba(47, 138, 76, 0.2); color: #2f8a4c; }
 .skill-card .card-tag { background-color: rgba(255, 200, 80, 0.2); color: #ffc850; }
 .ap-card .card-tag { background-color: rgba(138, 90, 43, 0.2); color: #d39767; }
+.dify-card .card-tag { background-color: rgba(31, 155, 155, 0.2); color: #38c5c5; }
 .eval-card .card-tag { background-color: rgba(109, 74, 165, 0.2); color: #b07cc7; }
 .card-description { flex-grow: 1; margin-bottom: 1.5rem; }
 .card-description code { color: #cccccc; font-size: 0.9rem; display: block; line-height: 1.4; }
@@ -195,6 +202,7 @@ onMounted(() => {
 .kb-card .card-action { border-left-color: #2f8a4c; }
 .skill-card .card-action { border-left-color: #ffc850; }
 .ap-card .card-action { border-left-color: #d39767; }
+.dify-card .card-action { border-left-color: #38c5c5; }
 .eval-card .card-action { border-left-color: #b07cc7; }
 .action-text { color: #bbbbbb; font-size: 0.85rem; }
 .action-arrow { color: #33ff00; font-size: 1.2rem; font-weight: bold; transition: transform 0.2s; }
