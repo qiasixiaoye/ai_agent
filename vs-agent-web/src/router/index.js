@@ -7,7 +7,8 @@ const routes = [
   { path: '/observability',   name: 'Observability', component: () => import('../views/Observability.vue') },
   { path: '/skills',          name: 'Skills',        component: () => import('../views/Skills.vue') },
   { path: '/knowledge-base',  name: 'KnowledgeBase', component: () => import('../views/KnowledgeBase.vue') },
-  { path: '/eval',            name: 'Eval',          component: () => import('../views/Eval.vue') }
+  { path: '/eval',            name: 'Eval',          component: () => import('../views/Eval.vue') },
+  { path: '/agent-platform',  name: 'AgentPlatform', component: () => import('../views/AgentPlatform.vue') }
 ]
 
 const router = createRouter({

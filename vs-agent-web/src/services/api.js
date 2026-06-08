@@ -130,4 +130,29 @@ export const runEvalSuite = async (suiteName) => {
   return unwrap(response)
 }
 
+// ---------------- Agent Platform ----------------
+
+export const listPlatformTools = async () => {
+  const response = await api.get('/agent-platform/tools')
+  return unwrap(response)
+}
+
+export const executePlatformTool = async (toolName, args, traceId) => {
+  const response = await api.post(`/agent-platform/tools/${encodeURIComponent(toolName)}/execute`, {
+    traceId,
+    arguments: args || {}
+  })
+  return unwrap(response)
+}
+
+export const executePlatformTask = async (task) => {
+  const response = await api.post('/agent-platform/tasks/execute', task, { timeout: 600000 })
+  return unwrap(response)
+}
+
+export const executePlatformDemoTask = async (query) => {
+  const response = await api.post('/agent-platform/tasks/demo', { query }, { timeout: 600000 })
+  return unwrap(response)
+}
+
 export default api
