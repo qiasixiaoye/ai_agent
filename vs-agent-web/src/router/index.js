@@ -9,7 +9,8 @@ const routes = [
   { path: '/knowledge-base',  name: 'KnowledgeBase', component: () => import('../views/KnowledgeBase.vue') },
   { path: '/eval',            name: 'Eval',          component: () => import('../views/Eval.vue') },
   { path: '/agent-platform',  name: 'AgentPlatform', component: () => import('../views/AgentPlatform.vue') },
-  { path: '/dify',            name: 'Dify',          component: () => import('../views/Dify.vue') }
+  { path: '/dify',            name: 'Dify',          component: () => import('../views/Dify.vue') },
+  { path: '/workflow',        name: 'Workflow',      component: () => import('../views/Workflow.vue') }
 ]
 
 const router = createRouter({

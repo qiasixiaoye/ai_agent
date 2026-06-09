@@ -3,53 +3,37 @@ import axios from 'axios'
 const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081'
 const api = axios.create({
   baseURL,
-  headers: {
-    'Content-Type': 'application/json'
-  }
+  headers: { 'Content-Type': 'application/json' }
 })
 
 // ---------------- AssistantApp / Manus (SSE) ----------------
 
-export const connectToAssistantAppChat = (message, chatId) => {
-  const url = `${baseURL}/api/ai/assistant_app/chat/sse?message=${encodeURIComponent(message)}&chatId=${encodeURIComponent(chatId)}`
-  return new EventSource(url)
-}
+export const connectToAssistantAppChat = (message, chatId) =>
+  new EventSource(`${baseURL}/api/ai/assistant_app/chat/sse?message=${encodeURIComponent(message)}&chatId=${encodeURIComponent(chatId)}`)
 
-export const connectToAssistantAppRagChat = (message, chatId) => {
-  const url = `${baseURL}/api/ai/assistant_app/chat_rag/sse?message=${encodeURIComponent(message)}&chatId=${encodeURIComponent(chatId)}`
-  return new EventSource(url)
-}
+export const connectToAssistantAppRagChat = (message, chatId) =>
+  new EventSource(`${baseURL}/api/ai/assistant_app/chat_rag/sse?message=${encodeURIComponent(message)}&chatId=${encodeURIComponent(chatId)}`)
 
-export const connectToManusChat = (message, contentText) => {
-  const url = `${baseURL}/api/ai/manus/chat?message=${encodeURIComponent(message)}&contentText=${encodeURIComponent(contentText)}`
-  return new EventSource(url)
-}
+export const connectToManusChat = (message, contentText) =>
+  new EventSource(`${baseURL}/api/ai/manus/chat?message=${encodeURIComponent(message)}&contentText=${encodeURIComponent(contentText)}`)
 
 // ---------------- Common ----------------
 
 const unwrap = (response) => {
-  if (response?.data?.code !== 0) {
-    throw new Error(response?.data?.message || '请求失败')
-  }
+  if (response?.data?.code !== 0) throw new Error(response?.data?.message || '请求失败')
   return response.data.data
 }
 
 // ---------------- Observability ----------------
 
-export const queryRequestTrace = async (requestId) => {
-  const response = await api.get(`/observability/requests/${encodeURIComponent(requestId)}`)
-  return unwrap(response)
-}
+export const queryRequestTrace = async (requestId) =>
+  unwrap(await api.get(`/observability/requests/${encodeURIComponent(requestId)}`))
 
-export const querySessionRequests = async (sessionId, limit = 20) => {
-  const response = await api.get(`/observability/sessions/${encodeURIComponent(sessionId)}/requests`, { params: { limit } })
-  return unwrap(response)
-}
+export const querySessionRequests = async (sessionId, limit = 20) =>
+  unwrap(await api.get(`/observability/sessions/${encodeURIComponent(sessionId)}/requests`, { params: { limit } }))
 
-export const queryFailedRequests = async (startTime, endTime, limit = 100) => {
-  const response = await api.post('/observability/requests/failures', { startTime, endTime, limit })
-  return unwrap(response)
-}
+export const queryFailedRequests = async (startTime, endTime, limit = 100) =>
+  unwrap(await api.post('/observability/requests/failures', { startTime, endTime, limit }))
 
 // ---------------- Files ----------------
 
@@ -100,5 +84,21 @@ export const runDifyWorkflow = async ({ workflowId, inputs, user }) =>
     user: user || undefined,
     responseMode: 'blocking'
   }, { timeout: 600000 }))
+
+// ---------------- Workflow (NL → DSL → exec/eval/export) ----------------
+
+export const generateWorkflow = async (prompt) =>
+  unwrap(await api.post('/workflow/generate', { prompt }, { timeout: 600000 }))
+
+export const listWorkflows = async () => unwrap(await api.get('/workflow'))
+export const getWorkflow = async (id) => unwrap(await api.get(`/workflow/${encodeURIComponent(id)}`))
+
+export const executeWorkflow = async (id, input) =>
+  unwrap(await api.post(`/workflow/${encodeURIComponent(id)}/execute`, { input }, { timeout: 600000 }))
+
+export const evalWorkflow = async (id, body) =>
+  unwrap(await api.post(`/workflow/${encodeURIComponent(id)}/eval`, body, { timeout: 600000 }))
+
+export const workflowDifyDslUrl = (id) => `${baseURL}/api/workflow/${encodeURIComponent(id)}/dify-dsl`
 
 export default api
