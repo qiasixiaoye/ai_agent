@@ -11,7 +11,14 @@ $installPath = Resolve-Path -LiteralPath (New-Item -ItemType Directory -Force -P
 $repoPath = Join-Path $installPath "dify"
 
 if (-not (Test-Path (Join-Path $repoPath ".git"))) {
-    git clone $DifyRepo $repoPath
+    if ($Checkout) {
+        git clone $DifyRepo $repoPath
+    } else {
+        git clone --depth 1 $DifyRepo $repoPath
+    }
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to clone official Dify repository. Check GitHub network access and retry."
+    }
 }
 
 Push-Location $repoPath
