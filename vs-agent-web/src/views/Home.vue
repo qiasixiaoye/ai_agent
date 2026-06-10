@@ -1,47 +1,73 @@
 <template>
   <main class="home-page">
-    <section class="topbar">
+    <header class="shell-header">
       <div>
         <p class="eyebrow">AI Agent Platform</p>
-        <h1>智能体研发工作台</h1>
-        <p class="subtitle">助手、知识库、Skill、工作流、Dify、Eval 与可观测性统一入口</p>
+        <h1>智能体研发控制台</h1>
+        <p class="subtitle">按“准备资源 → 生成编排 → 连接运行 → 评测交付”的顺序组织入口。</p>
       </div>
-      <div class="runtime">
+      <div class="runtime-panel">
         <span :class="['status-dot', summaryLoading ? 'pending' : backendOk ? 'ok' : 'fail']"></span>
         <div>
           <strong>{{ summaryLoading ? '检查中' : backendOk ? '后端可用' : '后端异常' }}</strong>
           <span>{{ apiBase }}</span>
         </div>
       </div>
-    </section>
+    </header>
 
-    <section class="metrics-grid" aria-label="平台概览">
-      <article v-for="item in metrics" :key="item.label" class="metric">
-        <span>{{ item.label }}</span>
-        <strong>{{ item.value }}</strong>
-      </article>
-    </section>
+    <section class="layout">
+      <aside class="flow-rail" aria-label="研发阶段">
+        <button
+          v-for="phase in phases"
+          :key="phase.id"
+          type="button"
+          :class="['phase-button', { active: selectedPhase === phase.id }]"
+          @click="selectedPhase = phase.id"
+        >
+          <span class="phase-index">{{ phase.index }}</span>
+          <span>
+            <strong>{{ phase.title }}</strong>
+            <small>{{ phase.summary }}</small>
+          </span>
+        </button>
+      </aside>
 
-    <section class="workspace-grid" aria-label="能力入口">
-      <router-link
-        v-for="module in modules"
-        :key="module.path"
-        :to="module.path"
-        class="module-card"
-        :style="{ '--accent': module.accent }"
-      >
-        <div class="module-mark" aria-hidden="true">{{ module.mark }}</div>
-        <div class="module-main">
-          <div class="module-head">
-            <h2>{{ module.title }}</h2>
-            <span>{{ module.loop }}</span>
+      <section class="workspace">
+        <div class="workspace-head">
+          <div>
+            <span class="phase-label">阶段 {{ activePhase.index }}</span>
+            <h2>{{ activePhase.title }}</h2>
+            <p>{{ activePhase.description }}</p>
           </div>
-          <p>{{ module.description }}</p>
-          <div class="module-meta">
-            <span v-for="tag in module.tags" :key="tag">{{ tag }}</span>
-          </div>
+          <router-link class="primary-action" :to="activePhase.primary.path">
+            {{ activePhase.primary.label }}
+          </router-link>
         </div>
-      </router-link>
+
+        <div class="metrics-row" aria-label="平台状态">
+          <article v-for="item in activePhase.metrics" :key="item.label" class="metric">
+            <span>{{ item.label }}</span>
+            <strong>{{ item.value }}</strong>
+          </article>
+        </div>
+
+        <div class="module-list">
+          <router-link
+            v-for="module in activePhase.modules"
+            :key="module.path"
+            :to="module.path"
+            class="module-row"
+            :style="{ '--accent': module.accent }"
+          >
+            <span class="module-mark">{{ module.mark }}</span>
+            <span class="module-copy">
+              <strong>{{ module.title }}</strong>
+              <small>{{ module.description }}</small>
+            </span>
+            <span class="module-state">{{ module.state }}</span>
+          </router-link>
+        </div>
+      </section>
     </section>
   </main>
 </template>
@@ -55,21 +81,21 @@ import {
   listKbDocuments,
   listPlatformTools,
   listSkills,
-  listWorkflows,
-  querySessionRequests
+  listWorkflows
 } from '../services/api'
 
 useHead({
-  title: 'AI Agent Platform - 智能体研发工作台',
+  title: 'AI Agent Platform - 智能体研发控制台',
   meta: [
     {
       name: 'description',
-      content: 'Spring AI 智能体平台工作台，覆盖助手、Manus、知识库、Skill、工作流、Dify、Eval 与可观测性。'
+      content: '智能体研发控制台，按资源准备、工作流编排、运行连接和评测交付组织核心入口。'
     }
   ]
 })
 
 const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081/api'
+const selectedPhase = ref('prepare')
 const summaryLoading = ref(true)
 const summary = ref({
   workflows: '-',
@@ -77,8 +103,7 @@ const summary = ref({
   tools: '-',
   documents: '-',
   evalSuites: '-',
-  dify: '未知',
-  traces: '-'
+  dify: '未配置'
 })
 
 const backendOk = computed(() =>
@@ -86,117 +111,93 @@ const backendOk = computed(() =>
     .some((value) => value !== '-')
 )
 
-const metrics = computed(() => [
-  { label: '工作流', value: summary.value.workflows },
-  { label: 'Skills', value: summary.value.skills },
-  { label: '工具', value: summary.value.tools },
-  { label: '文档', value: summary.value.documents },
-  { label: '评测集', value: summary.value.evalSuites },
-  { label: 'Dify', value: summary.value.dify },
-  { label: '默认会话日志', value: summary.value.traces }
+const phases = computed(() => [
+  {
+    id: 'prepare',
+    index: '01',
+    title: '准备资源',
+    summary: '知识、技能、工具',
+    description: '先整理可被智能体使用的材料与能力，后续编排会直接依赖这些资源。',
+    primary: { label: '管理知识库', path: '/knowledge-base' },
+    metrics: [
+      { label: '文档', value: summary.value.documents },
+      { label: 'Skills', value: summary.value.skills },
+      { label: '工具', value: summary.value.tools }
+    ],
+    modules: [
+      module('KB', '知识库管理', '上传、解析、切块、向量化和索引重建。', '/knowledge-base', '#15803d', `${summary.value.documents} documents`),
+      module('SK', 'Skill 平台', '扫描 SKILL.md，查看 Schema 并执行技能。', '/skills', '#b45309', `${summary.value.skills} skills`),
+      module('AP', 'Agent 平台', '注册工具并配置多步任务编排。', '/agent-platform', '#be123c', `${summary.value.tools} tools`)
+    ]
+  },
+  {
+    id: 'compose',
+    index: '02',
+    title: '生成编排',
+    summary: '一句话到 DSL',
+    description: '把自然语言需求转成可执行 Workflow，再查看节点、导出 Dify YAML。',
+    primary: { label: '生成工作流', path: '/workflow' },
+    metrics: [
+      { label: '工作流', value: summary.value.workflows },
+      { label: 'Skills', value: summary.value.skills },
+      { label: 'Dify', value: summary.value.dify }
+    ],
+    modules: [
+      module('WF', '一句话工作流', '自然语言生成 DSL，支持执行、评测与 Dify YAML 导出。', '/workflow', '#2563eb', `${summary.value.workflows} workflows`),
+      module('SK', 'Skill Schema', '生成器会参考已注册 Skill，避免杜撰工具名。', '/skills', '#b45309', 'schema source'),
+      module('DF', 'Dify YAML', '将内部 WorkflowDef 导出为 Dify 可导入结构。', '/dify', '#0891b2', summary.value.dify)
+    ]
+  },
+  {
+    id: 'run',
+    index: '03',
+    title: '连接运行',
+    summary: '助手、Manus、Dify',
+    description: '选择交互入口：普通助手、自动推理智能体，或通过独立 Dify Bridge 调用外部工作流。',
+    primary: { label: '打开 AI 助手', path: '/assistant-app' },
+    metrics: [
+      { label: '后端', value: backendOk.value ? '可用' : '-' },
+      { label: 'Dify', value: summary.value.dify },
+      { label: '工具', value: summary.value.tools }
+    ],
+    modules: [
+      module('AS', 'AI 助手', '面向普通对话与 RAG 的在线助手入口。', '/assistant-app', '#0f766e', 'chat'),
+      module('MS', 'Manus 智能体', '多步推理与工具自动选择的智能体执行台。', '/manus-app', '#7c3aed', 'agent'),
+      module('DF', 'Dify Bridge', '通过独立服务调用 Dify Workflow，并导出本地 Skill OpenAPI。', '/dify', '#0891b2', summary.value.dify)
+    ]
+  },
+  {
+    id: 'validate',
+    index: '04',
+    title: '评测交付',
+    summary: '用例、Judge、报告',
+    description: '对助手或工作流跑评测集，确认输出满足关键字或 LLM-as-Judge 标准。',
+    primary: { label: '运行评测', path: '/eval' },
+    metrics: [
+      { label: '评测集', value: summary.value.evalSuites },
+      { label: '工作流', value: summary.value.workflows },
+      { label: 'Skills', value: summary.value.skills }
+    ],
+    modules: [
+      module('EV', 'Eval 评测', '运行 YAML 评测集，支持 Keyword 与 LLM Judge。', '/eval', '#4338ca', `${summary.value.evalSuites} suites`),
+      module('WF', '工作流评测', '生成后的 Workflow 可直接进入 Eval Harness。', '/workflow', '#2563eb', 'workflow runner'),
+      module('AS', '助手评测', '复用 Assistant runner 评估真实对话输出。', '/assistant-app', '#0f766e', 'assistant runner')
+    ]
+  }
 ])
 
-const modules = [
-  {
-    title: '一句话工作流',
-    loop: 'Workflow',
-    path: '/workflow',
-    mark: 'WF',
-    accent: '#2563eb',
-    description: '自然语言生成 DSL，支持执行、评测与 Dify YAML 导出。',
-    tags: ['NL to DSL', 'Exec', 'Export']
-  },
-  {
-    title: 'AI 助手',
-    loop: 'Assistant',
-    path: '/assistant-app',
-    mark: 'AS',
-    accent: '#0f766e',
-    description: '面向普通对话与 RAG 的在线助手入口。',
-    tags: ['Chat', 'RAG', 'SSE']
-  },
-  {
-    title: 'Manus 智能体',
-    loop: 'Manus',
-    path: '/manus-app',
-    mark: 'MS',
-    accent: '#7c3aed',
-    description: '多步推理与工具自动选择的智能体执行台。',
-    tags: ['ReAct', 'Tools', 'Plan']
-  },
-  {
-    title: '知识库管理',
-    loop: 'KB',
-    path: '/knowledge-base',
-    mark: 'KB',
-    accent: '#15803d',
-    description: '上传、解析、切块、向量化和索引重建。',
-    tags: ['Upload', 'Vector', 'Index']
-  },
-  {
-    title: 'Skill 平台',
-    loop: 'Skills',
-    path: '/skills',
-    mark: 'SK',
-    accent: '#b45309',
-    description: '扫描 SKILL.md，在线查看 Schema 并执行技能。',
-    tags: ['Registry', 'Schema', 'Run']
-  },
-  {
-    title: 'Agent 平台',
-    loop: 'AgentPlatform',
-    path: '/agent-platform',
-    mark: 'AP',
-    accent: '#be123c',
-    description: '工具注册中心与可配置任务编排。',
-    tags: ['Tools', 'Task', 'Trace']
-  },
-  {
-    title: 'Dify 集成',
-    loop: 'Dify',
-    path: '/dify',
-    mark: 'DF',
-    accent: '#0891b2',
-    description: '对接 Dify Workflow，同时导出平台 OpenAPI。',
-    tags: ['Run', 'OpenAPI', 'Bridge']
-  },
-  {
-    title: 'Eval 评测',
-    loop: 'Eval',
-    path: '/eval',
-    mark: 'EV',
-    accent: '#4338ca',
-    description: '运行 YAML 评测集，支持 Keyword 与 LLM Judge。',
-    tags: ['Suite', 'Judge', 'Report']
-  },
-  {
-    title: '可观测性',
-    loop: 'Observability',
-    path: '/observability',
-    mark: 'OB',
-    accent: '#475569',
-    description: '按 request、session 与失败时间窗查询执行链路。',
-    tags: ['Trace', 'Stages', 'Failures']
-  }
-]
+const activePhase = computed(() =>
+  phases.value.find((item) => item.id === selectedPhase.value) || phases.value[0]
+)
 
 onMounted(async () => {
-  const [
-    workflows,
-    skills,
-    tools,
-    documents,
-    suites,
-    dify,
-    traces
-  ] = await Promise.allSettled([
+  const [workflows, skills, tools, documents, suites, dify] = await Promise.allSettled([
     listWorkflows(),
     listSkills(),
     listPlatformTools(),
     listKbDocuments(20),
     listEvalSuites(),
-    difyHealth(),
-    querySessionRequests('default', 20)
+    difyHealth()
   ])
 
   summary.value = {
@@ -205,10 +206,18 @@ onMounted(async () => {
     tools: countValue(tools),
     documents: countValue(documents),
     evalSuites: countValue(suites),
-    dify: dify.status === 'fulfilled' && dify.value?.configured ? '已配置' : '未配置',
-    traces: countValue(traces)
+    dify: dify.status === 'fulfilled' && dify.value?.configured ? '已配置' : '未配置'
   }
   summaryLoading.value = false
+})
+
+const module = (mark, title, description, path, accent, state) => ({
+  mark,
+  title,
+  description,
+  path,
+  accent,
+  state
 })
 
 const countValue = (settled) => {
@@ -221,17 +230,15 @@ const countValue = (settled) => {
 <style scoped>
 .home-page {
   min-height: 100vh;
-  background:
-    linear-gradient(180deg, rgba(238, 242, 247, 0.9), rgba(248, 250, 252, 1)),
-    #f8fafc;
+  background: #f6f8fb;
   color: #172033;
   padding: 28px;
 }
 
-.topbar {
+.shell-header {
   max-width: 1240px;
-  margin: 0 auto 18px;
-  min-height: 148px;
+  margin: 0 auto 20px;
+  min-height: 134px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -247,20 +254,32 @@ const countValue = (settled) => {
   text-transform: uppercase;
 }
 
-h1 {
+h1,
+h2 {
   margin: 0;
-  font-size: 38px;
+}
+
+h1 {
+  font-size: 36px;
   line-height: 1.15;
+}
+
+h2 {
+  font-size: 28px;
+}
+
+.subtitle,
+.workspace-head p {
+  color: #5f6f86;
 }
 
 .subtitle {
   margin: 12px 0 0;
-  color: #5f6f86;
   font-size: 16px;
 }
 
-.runtime {
-  min-width: 244px;
+.runtime-panel {
+  min-width: 248px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -271,12 +290,12 @@ h1 {
   box-shadow: 0 8px 26px rgba(31, 45, 61, 0.06);
 }
 
-.runtime strong,
-.runtime span:last-child {
+.runtime-panel strong,
+.runtime-panel span:last-child {
   display: block;
 }
 
-.runtime span:last-child {
+.runtime-panel span:last-child {
   color: #64748b;
   font-size: 12px;
   margin-top: 3px;
@@ -303,22 +322,124 @@ h1 {
   background: #f59e0b;
 }
 
-.metrics-grid,
-.workspace-grid {
+.layout {
   max-width: 1240px;
   margin: 0 auto;
+  display: grid;
+  grid-template-columns: 296px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
 }
 
-.metrics-grid {
+.flow-rail {
+  background: #ffffff;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0 8px 26px rgba(31, 45, 61, 0.05);
+}
+
+.phase-button {
+  width: 100%;
   display: grid;
-  grid-template-columns: repeat(7, minmax(120px, 1fr));
+  grid-template-columns: 42px 1fr;
   gap: 10px;
-  margin-bottom: 16px;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #172033;
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.phase-button + .phase-button {
+  margin-top: 4px;
+}
+
+.phase-button:hover,
+.phase-button.active {
+  background: #eef4ff;
+  border-color: #c9dafc;
+}
+
+.phase-index {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #e8eef8;
+  color: #2563eb;
+  font-weight: 800;
+}
+
+.phase-button strong,
+.phase-button small {
+  display: block;
+}
+
+.phase-button small {
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.workspace {
+  min-height: 568px;
+  background: #ffffff;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  padding: 22px;
+  box-shadow: 0 8px 26px rgba(31, 45, 61, 0.05);
+}
+
+.workspace-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #e5ebf3;
+}
+
+.phase-label {
+  display: inline-block;
+  margin-bottom: 8px;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.workspace-head p {
+  margin: 10px 0 0;
+  line-height: 1.6;
+}
+
+.primary-action {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  color: #ffffff;
+  background: #2563eb;
+  text-decoration: none;
+  border-radius: 7px;
+  padding: 0 14px;
+  font-weight: 700;
+}
+
+.metrics-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  gap: 10px;
+  margin: 18px 0;
 }
 
 .metric {
-  background: #ffffff;
-  border: 1px solid #dbe3ef;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 12px;
   min-height: 72px;
@@ -336,123 +457,114 @@ h1 {
   font-size: 22px;
 }
 
-.workspace-grid {
+.module-list {
   display: grid;
-  grid-template-columns: repeat(3, minmax(260px, 1fr));
-  gap: 14px;
+  gap: 10px;
 }
 
-.module-card {
-  min-height: 184px;
+.module-row {
   display: grid;
-  grid-template-columns: 52px 1fr;
-  gap: 14px;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
   color: inherit;
   text-decoration: none;
   background: #ffffff;
-  border: 1px solid #dbe3ef;
-  border-top: 3px solid var(--accent);
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid var(--accent);
   border-radius: 8px;
-  padding: 16px;
-  box-shadow: 0 8px 26px rgba(31, 45, 61, 0.05);
-  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  padding: 14px;
+  transition: background 0.16s ease, border-color 0.16s ease;
 }
 
-.module-card:hover {
-  transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--accent), #dbe3ef 48%);
-  box-shadow: 0 14px 34px rgba(31, 45, 61, 0.1);
+.module-row:hover {
+  background: #f8fafc;
+  border-color: color-mix(in srgb, var(--accent), #dbe3ef 55%);
 }
 
 .module-mark {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   display: grid;
   place-items: center;
   border-radius: 8px;
   background: color-mix(in srgb, var(--accent), white 88%);
   color: var(--accent);
   font-weight: 800;
-  letter-spacing: 0;
 }
 
-.module-main {
+.module-copy {
   min-width: 0;
 }
 
-.module-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
+.module-copy strong,
+.module-copy small {
+  display: block;
 }
 
-.module-head h2 {
-  margin: 0;
-  font-size: 18px;
+.module-copy small {
+  margin-top: 4px;
+  color: #64748b;
+  line-height: 1.5;
 }
 
-.module-head span {
-  flex: 0 0 auto;
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.module-card p {
-  margin: 12px 0 14px;
-  color: #5f6f86;
-  line-height: 1.55;
-  font-size: 14px;
-}
-
-.module-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.module-meta span {
+.module-state {
   color: #475569;
   background: #f1f5f9;
   border: 1px solid #e2e8f0;
   border-radius: 6px;
-  padding: 4px 7px;
+  padding: 5px 8px;
   font-size: 12px;
+  white-space: nowrap;
 }
 
-@media (max-width: 1080px) {
-  .metrics-grid {
-    grid-template-columns: repeat(4, minmax(120px, 1fr));
+@media (max-width: 920px) {
+  .layout {
+    grid-template-columns: 1fr;
   }
 
-  .workspace-grid {
-    grid-template-columns: repeat(2, minmax(260px, 1fr));
+  .flow-rail {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .phase-button + .phase-button {
+    margin-top: 0;
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 680px) {
   .home-page {
     padding: 18px;
   }
 
-  .topbar {
-    align-items: stretch;
+  .shell-header,
+  .workspace-head {
     flex-direction: column;
-    padding-bottom: 18px;
+    align-items: stretch;
   }
 
   h1 {
     font-size: 28px;
   }
 
-  .metrics-grid,
-  .workspace-grid {
+  h2 {
+    font-size: 24px;
+  }
+
+  .flow-rail,
+  .metrics-row {
     grid-template-columns: 1fr;
   }
 
-  .runtime {
-    min-width: 0;
+  .module-row {
+    grid-template-columns: 42px minmax(0, 1fr);
+  }
+
+  .module-state {
+    grid-column: 2;
+    justify-self: start;
   }
 }
 </style>

@@ -1,21 +1,27 @@
 import axios from 'axios'
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081/api'
+const difyServiceURL = import.meta.env.VITE_DIFY_SERVICE_URL || 'http://localhost:8090'
 const api = axios.create({
   baseURL,
+  headers: { 'Content-Type': 'application/json' }
+})
+
+const difyService = axios.create({
+  baseURL: difyServiceURL,
   headers: { 'Content-Type': 'application/json' }
 })
 
 // ---------------- AssistantApp / Manus (SSE) ----------------
 
 export const connectToAssistantAppChat = (message, chatId) =>
-  new EventSource(`${baseURL}/api/ai/assistant_app/chat/sse?message=${encodeURIComponent(message)}&chatId=${encodeURIComponent(chatId)}`)
+  new EventSource(`${baseURL}/ai/assistant_app/chat/sse?message=${encodeURIComponent(message)}&chatId=${encodeURIComponent(chatId)}`)
 
 export const connectToAssistantAppRagChat = (message, chatId) =>
-  new EventSource(`${baseURL}/api/ai/assistant_app/chat_rag/sse?message=${encodeURIComponent(message)}&chatId=${encodeURIComponent(chatId)}`)
+  new EventSource(`${baseURL}/ai/assistant_app/chat_rag/sse?message=${encodeURIComponent(message)}&chatId=${encodeURIComponent(chatId)}`)
 
 export const connectToManusChat = (message, contentText) =>
-  new EventSource(`${baseURL}/api/ai/manus/chat?message=${encodeURIComponent(message)}&contentText=${encodeURIComponent(contentText)}`)
+  new EventSource(`${baseURL}/ai/manus/chat?message=${encodeURIComponent(message)}&contentText=${encodeURIComponent(contentText)}`)
 
 // ---------------- Common ----------------
 
@@ -37,14 +43,14 @@ export const queryFailedRequests = async (startTime, endTime, limit = 100) =>
 
 // ---------------- Files ----------------
 
-export const fileDownloadUrl = (path) => `${baseURL}/api/files/download?path=${encodeURIComponent(path)}`
+export const fileDownloadUrl = (path) => `${baseURL}/files/download?path=${encodeURIComponent(path)}`
 
 // ---------------- Skills ----------------
 
 export const listSkills = async () => unwrap(await api.get('/skills'))
 export const getSkill = async (name) => unwrap(await api.get(`/skills/${encodeURIComponent(name)}`))
 export const executeSkill = async (name, args) => unwrap(await api.post(`/skills/${encodeURIComponent(name)}/execute`, args || {}))
-export const skillOpenApiUrl = () => `${baseURL}/api/skills/openapi.json`
+export const skillOpenApiUrl = () => `${baseURL}/skills/openapi.json`
 
 // ---------------- Knowledge Base ----------------
 
@@ -85,6 +91,16 @@ export const runDifyWorkflow = async ({ workflowId, inputs, user }) =>
     responseMode: 'blocking'
   }, { timeout: 600000 }))
 
+export const difyBridgeHealth = async () => (await difyService.get('/health')).data
+export const runDifyBridgeWorkflow = async ({ workflowId, inputs, user }) =>
+  (await difyService.post('/run', {
+    workflowId: workflowId || undefined,
+    inputs: inputs || {},
+    user: user || undefined,
+    responseMode: 'blocking'
+  }, { timeout: 600000 })).data
+export const difyBridgeUrl = () => difyServiceURL
+
 // ---------------- Workflow (NL → DSL → exec/eval/export) ----------------
 
 export const generateWorkflow = async (prompt) =>
@@ -99,6 +115,6 @@ export const executeWorkflow = async (id, input) =>
 export const evalWorkflow = async (id, body) =>
   unwrap(await api.post(`/workflow/${encodeURIComponent(id)}/eval`, body, { timeout: 600000 }))
 
-export const workflowDifyDslUrl = (id) => `${baseURL}/api/workflow/${encodeURIComponent(id)}/dify-dsl`
+export const workflowDifyDslUrl = (id) => `${baseURL}/workflow/${encodeURIComponent(id)}/dify-dsl`
 
 export default api

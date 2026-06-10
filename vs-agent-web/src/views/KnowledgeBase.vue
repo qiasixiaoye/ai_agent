@@ -1,94 +1,109 @@
 <template>
-  <div class="kb-container">
-    <div class="kb-header">
-      <router-link to="/" class="back-link"><span>←</span> 返回首页</router-link>
-      <h1>知识库管理</h1>
+  <main class="kb-page">
+    <header class="page-header">
+      <router-link to="/" class="back-link">返回首页</router-link>
+      <div>
+        <p class="eyebrow">RAG Source</p>
+        <h1>知识资料库</h1>
+        <p>为 AI 助手的 RAG 问答准备资料；上传后的文档会解析、切块并写入 pgvector。</p>
+      </div>
       <div class="header-actions">
-        <button class="btn ghost" @click="refresh" :disabled="loadingList">⟳ 刷新</button>
-        <button class="btn warn" @click="rebuildAll" :disabled="rebuilding">
-          {{ rebuilding ? '重建中…' : '重建全量索引' }}
+        <button class="ghost-btn" @click="refresh" :disabled="loadingList">刷新</button>
+        <button class="warn-btn" @click="rebuildAll" :disabled="rebuilding">
+          {{ rebuilding ? '重建中' : '重建索引' }}
         </button>
       </div>
-    </div>
+    </header>
 
-    <!-- 上传 -->
-    <section class="upload-card"
-             @dragover.prevent="dragOver = true"
-             @dragleave.prevent="dragOver = false"
-             @drop.prevent="onDrop"
-             :class="{ dragging: dragOver }">
-      <div class="upload-inner">
-        <div class="upload-icon">📄</div>
-        <div class="upload-text">
-          <strong>拖拽文件到此处</strong>，或
-          <label class="upload-link">
-            点此选择文件
+    <section class="summary-grid">
+      <article class="summary-card">
+        <span>文档总数</span>
+        <strong>{{ docs.length }}</strong>
+      </article>
+      <article class="summary-card">
+        <span>已完成</span>
+        <strong>{{ doneCount }}</strong>
+      </article>
+      <article class="summary-card">
+        <span>处理中</span>
+        <strong>{{ pendingCount }}</strong>
+      </article>
+      <article class="summary-card">
+        <span>失败</span>
+        <strong>{{ failedCount }}</strong>
+      </article>
+    </section>
+
+    <section class="content-grid">
+      <aside class="upload-panel">
+        <div class="panel-title">上传资料</div>
+        <div
+          :class="['drop-zone', { active: dragOver }]"
+          @dragover.prevent="dragOver = true"
+          @dragleave.prevent="dragOver = false"
+          @drop.prevent="onDrop"
+        >
+          <strong>拖入文件</strong>
+          <span>支持 PDF、Word、文本等 Tika 可解析格式</span>
+          <label class="file-button">
+            选择文件
             <input type="file" hidden @change="onFileChosen" />
           </label>
         </div>
-        <div class="upload-meta">
-          <input v-model="uploadSource" placeholder="来源（可选）" />
-          <input v-model="uploadTags" placeholder="标签，逗号分隔（可选）" />
-        </div>
-        <div v-if="uploading" class="upload-status">上传并解析中…</div>
-        <div v-if="lastUpload" class="upload-status success">
-          已收到：{{ lastUpload.documentId }}（{{ lastUpload.status }}{{ lastUpload.duplicated ? ' / 已存在' : '' }}）
-        </div>
-        <div v-if="uploadError" class="upload-status fail">{{ uploadError }}</div>
-      </div>
-    </section>
 
-    <!-- 列表 -->
-    <section class="list-card">
-      <div class="card-title">
-        最近文档 ({{ docs.length }})
-        <span v-if="loadingList" class="hint">加载中…</span>
-      </div>
-      <table v-if="docs.length > 0" class="kb-table">
-        <thead>
-          <tr>
-            <th>文件名</th>
-            <th>类型</th>
-            <th>状态</th>
-            <th>切片</th>
-            <th>来源</th>
-            <th>标签</th>
-            <th>上传时间</th>
-            <th class="actions-col">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="d in docs" :key="d.documentId">
-            <td class="file-cell" :title="d.documentId">{{ d.fileName }}</td>
-            <td>{{ d.fileType || '-' }}</td>
-            <td>
+        <label>来源</label>
+        <input v-model="uploadSource" placeholder="例如：产品手册 / 项目文档" />
+        <label>标签</label>
+        <input v-model="uploadTags" placeholder="逗号分隔，例如：rag,internal" />
+
+        <div v-if="uploading" class="notice">正在上传并解析...</div>
+        <div v-if="lastUpload" class="notice ok">
+          {{ lastUpload.documentId }} 已接收，状态 {{ lastUpload.status }}
+        </div>
+        <div v-if="uploadError" class="notice fail">{{ uploadError }}</div>
+      </aside>
+
+      <section class="table-panel">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">资料列表</div>
+            <p>这些资料只在调用助手 RAG 入口时参与检索，不影响普通对话和工作流生成。</p>
+          </div>
+        </div>
+
+        <div v-if="loadingList" class="empty-state">正在加载资料...</div>
+        <div v-else-if="docs.length === 0" class="empty-state">还没有资料，先上传一份用于 RAG 验证。</div>
+        <div v-else class="doc-list">
+          <article v-for="d in docs" :key="d.documentId" class="doc-row">
+            <div class="doc-main">
+              <strong :title="d.documentId">{{ d.fileName }}</strong>
+              <span>{{ d.source || '未设置来源' }} · {{ d.tags || '无标签' }}</span>
+            </div>
+            <div class="doc-meta">
               <span :class="['status-badge', statusClass(d.status)]">{{ d.status }}</span>
-              <div v-if="d.errorMessage" class="status-error" :title="d.errorMessage">⚠ {{ truncate(d.errorMessage, 32) }}</div>
-            </td>
-            <td>{{ d.chunkCount ?? 0 }}</td>
-            <td>{{ d.source || '-' }}</td>
-            <td>{{ d.tags || '-' }}</td>
-            <td>{{ formatTime(d.uploadedAt) }}</td>
-            <td class="actions-cell">
-              <button class="btn-mini" @click="reprocess(d)">重新处理</button>
-              <button class="btn-mini danger" @click="confirmDelete(d)">删除</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <div v-else-if="!loadingList" class="empty-hint">还没有文档，先用上面的上传区上传一份吧。</div>
+              <span>{{ d.chunkCount ?? 0 }} chunks</span>
+              <span>{{ formatTime(d.uploadedAt) }}</span>
+            </div>
+            <div class="doc-actions">
+              <button @click="reprocess(d)">重新处理</button>
+              <button class="danger" @click="confirmDelete(d)">删除</button>
+            </div>
+            <p v-if="d.errorMessage" class="row-error">{{ d.errorMessage }}</p>
+          </article>
+        </div>
+      </section>
     </section>
-  </div>
+  </main>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import {
-  listKbDocuments,
-  uploadKbDocument,
   deleteKbDocument,
+  listKbDocuments,
+  rebuildKbIndex,
   reprocessKbDocument,
-  rebuildKbIndex
+  uploadKbDocument
 } from '../services/api'
 
 const docs = ref([])
@@ -101,12 +116,14 @@ const uploadTags = ref('')
 const lastUpload = ref(null)
 const uploadError = ref(null)
 
+const doneCount = computed(() => docs.value.filter((d) => statusClass(d.status) === 'ok').length)
+const pendingCount = computed(() => docs.value.filter((d) => statusClass(d.status) === 'pending').length)
+const failedCount = computed(() => docs.value.filter((d) => statusClass(d.status) === 'fail').length)
+
 const refresh = async () => {
   loadingList.value = true
   try {
-    docs.value = await listKbDocuments(50)
-  } catch (e) {
-    console.error(e)
+    docs.value = await listKbDocuments(80)
   } finally {
     loadingList.value = false
   }
@@ -129,174 +146,362 @@ const doUpload = async (file) => {
   }
 }
 
-const onFileChosen = (e) => {
-  const f = e.target.files && e.target.files[0]
-  if (f) doUpload(f)
-  e.target.value = ''
+const onFileChosen = (event) => {
+  const file = event.target.files && event.target.files[0]
+  if (file) doUpload(file)
+  event.target.value = ''
 }
 
-const onDrop = (e) => {
+const onDrop = (event) => {
   dragOver.value = false
-  const f = e.dataTransfer.files && e.dataTransfer.files[0]
-  if (f) doUpload(f)
+  const file = event.dataTransfer.files && event.dataTransfer.files[0]
+  if (file) doUpload(file)
 }
 
-const reprocess = async (d) => {
-  try {
-    await reprocessKbDocument(d.documentId)
-    await refresh()
-  } catch (e) {
-    alert(e.message || '重处理失败')
-  }
+const reprocess = async (doc) => {
+  await reprocessKbDocument(doc.documentId)
+  await refresh()
 }
 
-const confirmDelete = async (d) => {
-  if (!confirm(`确认删除 ${d.fileName}？`)) return
-  try {
-    await deleteKbDocument(d.documentId)
-    await refresh()
-  } catch (e) {
-    alert(e.message || '删除失败')
-  }
+const confirmDelete = async (doc) => {
+  if (!confirm(`确认删除 ${doc.fileName}？`)) return
+  await deleteKbDocument(doc.documentId)
+  await refresh()
 }
 
 const rebuildAll = async () => {
-  if (!confirm('重建全量向量索引可能耗时较久，确认？')) return
+  if (!confirm('确认重建所有文档的向量索引？')) return
   rebuilding.value = true
   try {
     await rebuildKbIndex()
     await refresh()
-  } catch (e) {
-    alert(e.message || '重建失败')
   } finally {
     rebuilding.value = false
   }
 }
 
-const formatTime = (t) => {
-  if (!t) return '-'
-  try { return new Date(t).toLocaleString() } catch { return t }
+const statusClass = (status) => {
+  const value = String(status || '').toUpperCase()
+  if (value.includes('SUCCESS') || value.includes('READY') || value.includes('PROCESSED')) return 'ok'
+  if (value.includes('FAIL') || value.includes('ERROR')) return 'fail'
+  if (value.includes('PROCESS') || value.includes('PENDING')) return 'pending'
+  return ''
 }
 
-const truncate = (s, n) => (s && s.length > n ? s.slice(0, n) + '…' : s)
-
-const statusClass = (s) => {
-  if (!s) return ''
-  const up = String(s).toUpperCase()
-  if (up.includes('SUCCESS') || up.includes('READY') || up === 'PROCESSED') return 'ok'
-  if (up.includes('FAIL') || up.includes('ERROR')) return 'fail'
-  if (up.includes('PROCESS') || up.includes('PENDING')) return 'pending'
-  return ''
+const formatTime = (value) => {
+  if (!value) return '-'
+  try {
+    return new Date(value).toLocaleString()
+  } catch {
+    return value
+  }
 }
 
 onMounted(refresh)
 </script>
 
 <style scoped>
-.kb-container {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: #f5f7fb;
-  color: #222;
+.kb-page {
+  min-height: 100vh;
+  background: #f6f8fb;
+  color: #172033;
+  padding: 24px;
 }
-.kb-header {
-  display: flex;
-  align-items: center;
-  padding: 12px 20px;
-  background: #2f8a4c;
-  color: white;
-}
-.kb-header h1 { margin: 0 auto; font-size: 1.4rem; }
-.back-link {
-  color: white;
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-}
-.back-link span { font-size: 1.2rem; margin-right: 5px; }
 
-.header-actions { display: flex; gap: 8px; }
-.btn {
-  border: none;
-  border-radius: 4px;
-  padding: 6px 12px;
+.page-header,
+.summary-grid,
+.content-grid {
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+.page-header {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: start;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #dbe3ef;
+}
+
+.back-link {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: #15803d;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0;
+  font-size: 32px;
+}
+
+.page-header p,
+.panel-head p {
+  margin: 8px 0 0;
+  color: #64748b;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+button,
+.file-button {
+  min-height: 34px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #172033;
+  padding: 0 12px;
   cursor: pointer;
+}
+
+.ghost-btn:hover,
+.doc-actions button:hover {
+  background: #f1f5f9;
+}
+
+.warn-btn {
+  background: #1f7a4d;
+  border-color: #1f7a4d;
+  color: #ffffff;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.summary-card,
+.upload-panel,
+.table-panel {
+  background: #ffffff;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  box-shadow: 0 8px 26px rgba(31, 45, 61, 0.05);
+}
+
+.summary-card {
+  padding: 14px;
+}
+
+.summary-card span {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.summary-card strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 24px;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.upload-panel,
+.table-panel {
+  padding: 18px;
+}
+
+.panel-title {
+  color: #172033;
+  font-weight: 800;
+  font-size: 17px;
+}
+
+.drop-zone {
+  min-height: 164px;
+  display: grid;
+  place-items: center;
+  gap: 7px;
+  border: 1px dashed #94a3b8;
+  border-radius: 8px;
+  background: #f8fafc;
+  margin: 14px 0;
+  text-align: center;
+  color: #64748b;
+}
+
+.drop-zone.active {
+  border-color: #15803d;
+  background: #ecfdf3;
+}
+
+.drop-zone strong {
+  color: #172033;
+}
+
+.file-button {
+  display: inline-flex;
+  align-items: center;
+  background: #15803d;
+  border-color: #15803d;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+label {
+  display: block;
+  margin: 10px 0 5px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+input {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  padding: 0 10px;
+}
+
+.notice {
+  margin-top: 12px;
+  color: #475569;
   font-size: 13px;
 }
-.btn.ghost { background: rgba(255,255,255,0.18); color: white; border: 1px solid rgba(255,255,255,0.4); }
-.btn.warn { background: #f0ad4e; color: white; }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.upload-card {
-  margin: 16px 20px 0;
-  background: white;
-  border: 2px dashed #cdd6e0;
+.notice.ok {
+  color: #15803d;
+}
+
+.notice.fail,
+.row-error {
+  color: #b91c1c;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.empty-state {
+  color: #64748b;
+  text-align: center;
+  padding: 72px 0;
+}
+
+.doc-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.doc-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto auto;
+  gap: 14px;
+  align-items: center;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #15803d;
   border-radius: 8px;
-  padding: 18px;
-  transition: border-color 0.15s, background 0.15s;
+  padding: 13px;
 }
-.upload-card.dragging { border-color: #2f8a4c; background: #f0fbf4; }
-.upload-inner { display: flex; flex-direction: column; gap: 8px; align-items: center; }
-.upload-icon { font-size: 30px; }
-.upload-text strong { color: #2a3a55; }
-.upload-link { color: #2f8a4c; cursor: pointer; text-decoration: underline; }
-.upload-meta { display: flex; gap: 8px; margin-top: 6px; width: 100%; max-width: 540px; }
-.upload-meta input {
-  flex: 1; padding: 6px 8px; border: 1px solid #d0d7e2; border-radius: 4px; font-size: 13px;
-}
-.upload-status { font-size: 13px; color: #555; }
-.upload-status.success { color: #1a7a1a; }
-.upload-status.fail { color: #b01a1a; }
 
-.list-card {
-  flex: 1;
-  margin: 16px 20px 20px;
-  background: white;
-  border: 1px solid #e5e8f0;
-  border-radius: 8px;
-  padding: 16px;
-  overflow-y: auto;
+.doc-main strong,
+.doc-main span {
+  display: block;
 }
-.card-title { font-weight: 600; color: #2a3a55; margin-bottom: 12px; }
-.hint { color: #8a96b3; font-size: 12px; margin-left: 6px; }
 
-.kb-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.kb-table th, .kb-table td {
-  padding: 8px 10px;
-  text-align: left;
-  border-bottom: 1px solid #eef0f5;
+.doc-main span {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 13px;
 }
-.kb-table th { background: #f7f9fc; color: #4a6fa5; font-weight: 600; }
-.kb-table tbody tr:hover { background: #fafbfd; }
-.file-cell { font-weight: 500; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.actions-col { width: 160px; }
-.actions-cell { display: flex; gap: 6px; }
 
-.btn-mini {
-  border: 1px solid #d0d7e2;
-  background: white;
-  border-radius: 4px;
-  padding: 4px 8px;
+.doc-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: #64748b;
   font-size: 12px;
-  cursor: pointer;
 }
-.btn-mini:hover { background: #f0f4fb; }
-.btn-mini.danger { color: #b01a1a; border-color: #f3d2d2; }
-.btn-mini.danger:hover { background: #fff5f5; }
 
 .status-badge {
-  display: inline-block;
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: #e5e8f0;
-  color: #4a6fa5;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border-radius: 6px;
+  padding: 0 8px;
+  background: #f1f5f9;
+  color: #475569;
+  font-weight: 700;
 }
-.status-badge.ok { background: #e0f5e0; color: #1a7a1a; }
-.status-badge.fail { background: #fde0e0; color: #b01a1a; }
-.status-badge.pending { background: #fff3d0; color: #a07000; }
-.status-error { color: #b01a1a; font-size: 11px; margin-top: 2px; }
 
-.empty-hint { color: #8a96b3; text-align: center; padding: 40px 0; }
+.status-badge.ok {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-badge.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-badge.fail {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.doc-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.doc-actions .danger {
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.row-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 12px;
+}
+
+@media (max-width: 920px) {
+  .page-header,
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
+
+  .doc-row {
+    grid-template-columns: 1fr;
+  }
+
+  .doc-meta,
+  .doc-actions {
+    flex-wrap: wrap;
+  }
+}
 </style>

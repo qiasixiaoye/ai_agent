@@ -44,9 +44,9 @@ public class WorkflowGenerator {
     private final ChatClient chatClient;
     private final SkillRegistry skillRegistry;
 
-    public WorkflowGenerator(ChatModel dashscopeChatModel, SkillRegistry skillRegistry) {
+    public WorkflowGenerator(ChatModel chatModel, SkillRegistry skillRegistry) {
         this.skillRegistry = skillRegistry;
-        this.chatClient = ChatClient.builder(dashscopeChatModel).build();
+        this.chatClient = ChatClient.builder(chatModel).build();
     }
 
     public WorkflowDef generate(String userPrompt) {

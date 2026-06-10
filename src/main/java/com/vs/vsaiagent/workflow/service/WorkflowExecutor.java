@@ -36,8 +36,8 @@ public class WorkflowExecutor {
     private final ChatClient chatClient;
     private final SkillRegistry skillRegistry;
 
-    public WorkflowExecutor(ChatModel dashscopeChatModel, SkillRegistry skillRegistry) {
-        this.chatClient = ChatClient.builder(dashscopeChatModel).build();
+    public WorkflowExecutor(ChatModel chatModel, SkillRegistry skillRegistry) {
+        this.chatClient = ChatClient.builder(chatModel).build();
         this.skillRegistry = skillRegistry;
     }
 

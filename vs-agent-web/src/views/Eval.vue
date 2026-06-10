@@ -1,222 +1,468 @@
 <template>
-  <div class="eval-container">
-    <div class="eval-header">
-      <router-link to="/" class="back-link"><span>←</span> 返回首页</router-link>
-      <h1>Eval 评测</h1>
-      <button class="reload-btn" @click="refresh" :disabled="loadingSuites">⟳ 刷新</button>
-    </div>
+  <main class="eval-page">
+    <header class="page-header">
+      <router-link to="/" class="back-link">返回首页</router-link>
+      <div>
+        <p class="eyebrow">Workflow Eval</p>
+        <h1>工作流评测</h1>
+        <p>这里只评测最终生成的 WorkflowDef，避免混入助手、外部 runner 等其它目标。</p>
+      </div>
+      <button class="ghost-btn" @click="refreshWorkflows" :disabled="loading">刷新工作流</button>
+    </header>
 
-    <div class="eval-body">
-      <aside class="suite-list">
-        <div class="list-title">Suite 列表 ({{ suites.length }})</div>
-        <div v-if="loadingSuites" class="hint">加载中…</div>
-        <div v-else-if="suites.length === 0" class="hint">没有 suite，确认 classpath:eval/suites/*.yaml 是否存在。</div>
-        <ul v-else>
-          <li
-            v-for="s in suites"
-            :key="s.name"
-            :class="['suite-item', { active: current && current.name === s.name }]"
-            @click="select(s)"
-          >
-            <div class="suite-name">{{ s.name }}</div>
-            <div class="suite-desc">{{ s.description }}</div>
-            <div class="suite-meta">
-              <span class="badge">{{ s.cases?.length || 0 }} cases</span>
-              <span class="badge runner">{{ s.runner }}</span>
-            </div>
-          </li>
-        </ul>
+    <section class="eval-layout">
+      <aside class="workflow-panel">
+        <div class="panel-title">选择工作流</div>
+        <div v-if="loading" class="empty-state">加载中...</div>
+        <div v-else-if="workflows.length === 0" class="empty-state">还没有工作流，先去“一句话工作流”生成。</div>
+        <button
+          v-for="item in workflows"
+          v-else
+          :key="item.id"
+          type="button"
+          :class="['workflow-item', { active: current?.id === item.id }]"
+          @click="selectWorkflow(item)"
+        >
+          <strong>{{ item.name }}</strong>
+          <span>{{ item.nodes?.length || 0 }} nodes · {{ item.id.slice(0, 8) }}</span>
+        </button>
       </aside>
 
-      <section class="suite-detail">
-        <div v-if="!current" class="empty">
-          <div class="empty-icon">📊</div>
-          <p>左侧选一份 suite 开始评测</p>
-        </div>
-
+      <section class="detail-panel">
+        <div v-if="!current" class="empty-state large">选择一个工作流后编辑评测用例。</div>
         <template v-else>
           <div class="detail-head">
-            <h2>{{ current.name }}</h2>
-            <p class="detail-desc">{{ current.description }}</p>
-            <div class="detail-meta">
-              <span class="badge runner">runner: {{ current.runner }}</span>
-              <span class="badge">{{ current.cases?.length || 0 }} cases</span>
+            <div>
+              <span class="workflow-id">{{ current.id }}</span>
+              <h2>{{ current.name }}</h2>
+              <p>{{ current.description }}</p>
             </div>
+            <div class="judge-select">
+              <label>Judge</label>
+              <select v-model="judge">
+                <option value="keyword_contains">keyword_contains</option>
+                <option value="llm_as_judge">llm_as_judge</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="case-editor">
+            <div class="panel-title">Cases JSON</div>
+            <textarea v-model="casesJson" rows="12"></textarea>
             <div class="actions">
-              <button class="run-btn" :disabled="running" @click="runSuite">
-                {{ running ? `执行中… (${doneCount}/${current.cases?.length || 0})` : '执行 Suite' }}
+              <button class="primary-btn" :disabled="running" @click="runEval">
+                {{ running ? '评测中...' : '运行工作流评测' }}
               </button>
             </div>
-            <div v-if="runError" class="err">{{ runError }}</div>
+            <p v-if="error" class="error-text">{{ error }}</p>
           </div>
 
-          <div v-if="result" class="result-card">
-            <div class="result-summary">
-              <div class="kpi">
-                <div class="kpi-num">{{ result.total }}</div><div class="kpi-label">总数</div>
-              </div>
-              <div class="kpi ok">
-                <div class="kpi-num">{{ result.passed }}</div><div class="kpi-label">通过</div>
-              </div>
-              <div class="kpi fail">
-                <div class="kpi-num">{{ result.failed }}</div><div class="kpi-label">失败</div>
-              </div>
-              <div class="kpi">
-                <div class="kpi-num">{{ ((result.passed / Math.max(1, result.total)) * 100).toFixed(1) }}%</div>
-                <div class="kpi-label">通过率</div>
-              </div>
-              <div class="kpi">
-                <div class="kpi-num">{{ (result.totalElapsedMs / 1000).toFixed(1) }}s</div>
-                <div class="kpi-label">耗时</div>
-              </div>
+          <section v-if="result" class="result-panel">
+            <div class="summary-row">
+              <article>
+                <span>总数</span>
+                <strong>{{ result.total }}</strong>
+              </article>
+              <article class="ok">
+                <span>通过</span>
+                <strong>{{ result.passed }}</strong>
+              </article>
+              <article class="fail">
+                <span>失败</span>
+                <strong>{{ result.failed }}</strong>
+              </article>
+              <article>
+                <span>耗时</span>
+                <strong>{{ (result.totalElapsedMs / 1000).toFixed(1) }}s</strong>
+              </article>
             </div>
 
-            <table class="cases-table">
-              <thead>
-                <tr>
-                  <th>Case</th>
-                  <th>状态</th>
-                  <th>耗时</th>
-                  <th>原因</th>
-                  <th>展开</th>
-                </tr>
-              </thead>
-              <tbody>
-                <template v-for="c in result.cases" :key="c.caseId">
-                  <tr>
-                    <td class="case-id">{{ c.caseId }}</td>
-                    <td>
-                      <span :class="['status', c.pass ? 'pass' : 'fail']">{{ c.pass ? 'PASS' : 'FAIL' }}</span>
-                    </td>
-                    <td>{{ c.runnerElapsedMs }} ms</td>
-                    <td class="reason">{{ c.reason }}</td>
-                    <td><button class="toggle-btn" @click="toggle(c.caseId)">{{ expanded[c.caseId] ? '收起' : '展开' }}</button></td>
-                  </tr>
-                  <tr v-if="expanded[c.caseId]" class="case-detail">
-                    <td colspan="5">
-                      <div class="kv"><span>Input:</span><pre>{{ c.input }}</pre></div>
-                      <div class="kv"><span>Actual:</span><pre>{{ c.actualOutput }}</pre></div>
-                      <div v-if="c.missedKeywords && c.missedKeywords.length" class="kv">
-                        <span>Missed:</span>
-                        <code class="missed">{{ c.missedKeywords.join(', ') }}</code>
-                      </div>
-                    </td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
+            <div class="case-list">
+              <article v-for="item in result.cases" :key="item.caseId" class="case-row">
+                <div>
+                  <strong>{{ item.caseId }}</strong>
+                  <span>{{ item.input }}</span>
+                </div>
+                <span :class="['case-status', item.pass ? 'pass' : 'fail']">{{ item.pass ? 'PASS' : 'FAIL' }}</span>
+                <details>
+                  <summary>{{ item.reason || '查看输出' }}</summary>
+                  <pre>{{ item.actualOutput }}</pre>
+                </details>
+              </article>
+            </div>
+          </section>
         </template>
       </section>
-    </div>
-  </div>
+    </section>
+  </main>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { listEvalSuites, runEvalSuite } from '../services/api'
+import { onMounted, ref } from 'vue'
+import { evalWorkflow, listWorkflows } from '../services/api'
 
-const suites = ref([])
+const workflows = ref([])
 const current = ref(null)
-const loadingSuites = ref(false)
+const loading = ref(false)
 const running = ref(false)
-const runError = ref(null)
+const error = ref('')
 const result = ref(null)
-const doneCount = ref(0)
-const expanded = reactive({})
+const judge = ref('keyword_contains')
+const casesJson = ref(JSON.stringify({
+  cases: [
+    {
+      id: 'summary-basic',
+      input: 'Spring AI 是一个用于构建 AI 应用的 Java 框架，支持对话、RAG 和工具调用。',
+      expectedContains: ['Spring AI', '框架']
+    }
+  ]
+}, null, 2))
 
-const refresh = async () => {
-  loadingSuites.value = true
+const refreshWorkflows = async () => {
+  loading.value = true
   try {
-    suites.value = await listEvalSuites()
-  } catch (e) {
-    runError.value = e.message
+    workflows.value = await listWorkflows()
+    if (!current.value && workflows.value.length > 0) {
+      selectWorkflow(workflows.value[0])
+    }
   } finally {
-    loadingSuites.value = false
+    loading.value = false
   }
 }
 
-const select = (s) => {
-  current.value = s
+const selectWorkflow = (workflow) => {
+  current.value = workflow
   result.value = null
-  runError.value = null
-  Object.keys(expanded).forEach(k => delete expanded[k])
+  error.value = ''
 }
 
-const runSuite = async () => {
+const runEval = async () => {
   if (!current.value) return
   running.value = true
-  runError.value = null
+  error.value = ''
   result.value = null
-  doneCount.value = 0
   try {
-    result.value = await runEvalSuite(current.value.name)
-    doneCount.value = result.value.total
+    const body = JSON.parse(casesJson.value)
+    result.value = await evalWorkflow(current.value.id, {
+      judge: judge.value,
+      cases: body.cases || []
+    })
   } catch (e) {
-    runError.value = e.message
+    error.value = e.message || '评测失败'
   } finally {
     running.value = false
   }
 }
 
-const toggle = (id) => { expanded[id] = !expanded[id] }
-
-onMounted(refresh)
+onMounted(refreshWorkflows)
 </script>
 
 <style scoped>
-.eval-container { display: flex; flex-direction: column; height: 100vh; background: #f5f7fb; color: #222; }
-.eval-header { display: flex; align-items: center; padding: 12px 20px; background: #6d4aa5; color: white; }
-.eval-header h1 { margin: 0 auto; font-size: 1.4rem; }
-.back-link { color: white; text-decoration: none; display: flex; align-items: center; }
-.back-link span { font-size: 1.2rem; margin-right: 5px; }
-.reload-btn { background: rgba(255,255,255,0.18); color: white; border: 1px solid rgba(255,255,255,0.4); border-radius: 4px; padding: 4px 10px; cursor: pointer; }
-.reload-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.eval-body { flex: 1; display: flex; overflow: hidden; }
-.suite-list { width: 320px; min-width: 280px; background: white; border-right: 1px solid #e5e8f0; overflow-y: auto; padding: 12px; }
-.list-title { font-weight: 600; margin-bottom: 8px; color: #6d4aa5; }
-.suite-list ul { list-style: none; padding: 0; margin: 0; }
-.suite-item { padding: 10px 12px; border-radius: 6px; margin-bottom: 6px; cursor: pointer; border: 1px solid transparent; }
-.suite-item:hover { background: #f4f0fa; }
-.suite-item.active { background: #efe7ff; border-color: #6d4aa5; }
-.suite-name { font-weight: 600; color: #2a3a55; }
-.suite-desc { font-size: 12px; color: #6c7a99; margin-top: 4px; }
-.suite-meta { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
-.badge { display: inline-block; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #e5e8f0; color: #6d4aa5; }
-.badge.runner { background: #fff0e0; color: #b06000; }
-.suite-detail { flex: 1; overflow-y: auto; padding: 20px 28px; }
-.empty { text-align: center; padding-top: 120px; color: #8a96b3; }
-.empty-icon { font-size: 56px; }
-.detail-head { margin-bottom: 18px; }
-.detail-head h2 { margin: 0; }
-.detail-desc { color: #555; }
-.detail-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
-.actions { margin-top: 14px; }
-.run-btn { background: #6d4aa5; color: white; border: none; border-radius: 6px; padding: 8px 18px; font-size: 14px; cursor: pointer; }
-.run-btn:hover:not(:disabled) { background: #5a3a8a; }
-.run-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-.err { margin-top: 10px; color: #b01a1a; font-size: 13px; }
-.result-card { background: white; border: 1px solid #e5e8f0; border-radius: 8px; padding: 16px; }
-.result-summary { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
-.kpi { background: #f7f9fc; border-radius: 6px; padding: 10px 14px; min-width: 70px; text-align: center; }
-.kpi-num { font-size: 22px; font-weight: 700; color: #2a3a55; }
-.kpi-label { font-size: 11px; color: #6c7a99; margin-top: 2px; }
-.kpi.ok .kpi-num { color: #1a7a1a; }
-.kpi.fail .kpi-num { color: #b01a1a; }
-.cases-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.cases-table th, .cases-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #eef0f5; vertical-align: top; }
-.cases-table th { background: #f7f9fc; color: #6d4aa5; font-weight: 600; }
-.case-id { font-family: monospace; font-weight: 600; }
-.status { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; }
-.status.pass { background: #e0f5e0; color: #1a7a1a; }
-.status.fail { background: #fde0e0; color: #b01a1a; }
-.reason { color: #555; max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
-.toggle-btn { border: 1px solid #d0d7e2; background: white; border-radius: 4px; padding: 4px 8px; font-size: 12px; cursor: pointer; }
-.toggle-btn:hover { background: #f0f4fb; }
-.case-detail { background: #fafbfd; }
-.case-detail .kv { display: flex; align-items: flex-start; gap: 8px; margin: 6px 0; font-size: 12px; }
-.case-detail .kv > span { font-weight: 600; color: #6d4aa5; min-width: 56px; }
-.case-detail pre { background: #fff; border: 1px solid #e5e8f0; border-radius: 4px; padding: 6px 8px; margin: 0; white-space: pre-wrap; word-break: break-word; flex: 1; }
-.missed { color: #b01a1a; background: #fff5f5; padding: 1px 6px; border-radius: 3px; }
-.hint { color: #8a96b3; font-size: 13px; }
+.eval-page {
+  min-height: 100vh;
+  background: #f6f8fb;
+  color: #172033;
+  padding: 24px;
+}
+
+.page-header,
+.eval-layout {
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+.page-header {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: start;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #dbe3ef;
+}
+
+.back-link {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: #4338ca;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+h1,
+h2 {
+  margin: 0;
+}
+
+h1 {
+  font-size: 32px;
+}
+
+.page-header p,
+.detail-head p {
+  margin: 8px 0 0;
+  color: #64748b;
+}
+
+button,
+select {
+  min-height: 34px;
+  border-radius: 7px;
+  font: inherit;
+}
+
+.ghost-btn {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #172033;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.primary-btn {
+  border: 1px solid #4338ca;
+  background: #4338ca;
+  color: #ffffff;
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.eval-layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.workflow-panel,
+.detail-panel,
+.case-editor,
+.result-panel {
+  background: #ffffff;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  box-shadow: 0 8px 26px rgba(31, 45, 61, 0.05);
+}
+
+.workflow-panel,
+.detail-panel {
+  padding: 16px;
+}
+
+.panel-title {
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+
+.workflow-item {
+  width: 100%;
+  display: block;
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+}
+
+.workflow-item:hover,
+.workflow-item.active {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+
+.workflow-item strong,
+.workflow-item span {
+  display: block;
+}
+
+.workflow-item span {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.empty-state {
+  color: #64748b;
+  padding: 28px 0;
+  text-align: center;
+}
+
+.empty-state.large {
+  padding: 120px 0;
+}
+
+.detail-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.workflow-id {
+  display: inline-block;
+  color: #64748b;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.judge-select {
+  min-width: 180px;
+}
+
+label {
+  display: block;
+  margin-bottom: 5px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+select,
+textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+}
+
+select {
+  padding: 0 8px;
+}
+
+.case-editor {
+  margin-top: 16px;
+  padding: 16px;
+}
+
+textarea {
+  padding: 10px;
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 13px;
+  resize: vertical;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.error-text {
+  color: #b91c1c;
+  margin: 10px 0 0;
+}
+
+.result-panel {
+  margin-top: 16px;
+  padding: 16px;
+}
+
+.summary-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(90px, 1fr));
+  gap: 10px;
+}
+
+.summary-row article {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.summary-row span,
+.case-row span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.summary-row strong {
+  display: block;
+  margin-top: 7px;
+  font-size: 22px;
+}
+
+.summary-row .ok strong {
+  color: #15803d;
+}
+
+.summary-row .fail strong {
+  color: #b91c1c;
+}
+
+.case-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.case-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  gap: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.case-row strong,
+.case-row span {
+  display: block;
+}
+
+.case-status {
+  justify-self: end;
+  align-self: start;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-weight: 800;
+}
+
+.case-status.pass {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.case-status.fail {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+details {
+  grid-column: 1 / -1;
+  color: #475569;
+}
+
+summary {
+  cursor: pointer;
+}
+
+pre {
+  white-space: pre-wrap;
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  overflow: auto;
+}
+
+@media (max-width: 900px) {
+  .page-header,
+  .eval-layout,
+  .detail-head {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+}
 </style>

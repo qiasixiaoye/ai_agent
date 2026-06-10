@@ -13,12 +13,12 @@
         <span class="status-text">
           <template v-if="!health">检测中…</template>
           <template v-else-if="health.configured">
-            Dify 已配置：<code>{{ health.baseUrl }}</code>
+            Dify Bridge 已配置：<code>{{ health.baseUrl }}</code>
             <template v-if="health.defaultWorkflowId"> · 默认 workflow <code>{{ health.defaultWorkflowId }}</code></template>
           </template>
           <template v-else>
-            <strong>Dify 未配置</strong> — 在 application-*.yml 设置
-            <code>app.dify.base-url</code> 和 <code>app.dify.api-key</code>
+            <strong>Dify Bridge 未配置</strong> — 给独立容器设置
+            <code>DIFY_BASE_URL</code> 和 <code>DIFY_API_KEY</code>
           </template>
         </span>
       </div>
@@ -28,7 +28,11 @@
       <!-- 左：调用 Dify Workflow -->
       <section class="card">
         <div class="card-title">调用 Dify Workflow</div>
-        <div class="hint">如果留空将使用 app.dify.default-workflow-id。inputs 按你 workflow 的变量填。</div>
+        <div class="hint">当前页面调用独立 Dify Bridge：<code>{{ bridgeUrl }}</code></div>
+        <div class="official-row">
+          <a class="link-btn secondary" href="http://localhost:3001" target="_blank">打开官方 Dify 画布</a>
+          <span>导入 DSL 后在官方 canvas 中查看和拖动节点。</span>
+        </div>
         <label>Workflow ID（可选）</label>
         <input v-model="workflowId" placeholder="default workflow id" />
         <label>User（end-user 标识，留空自动生成）</label>
@@ -82,7 +86,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { difyHealth, runDifyWorkflow, skillOpenApiUrl } from '../services/api'
+import { difyBridgeHealth, difyBridgeUrl, runDifyBridgeWorkflow, skillOpenApiUrl } from '../services/api'
 
 const health = ref(null)
 const loadingHealth = ref(false)
@@ -92,13 +96,14 @@ const inputsJson = ref('{\n  "query": "hello dify"\n}')
 const running = ref(false)
 const runError = ref(null)
 const result = ref(null)
+const bridgeUrl = difyBridgeUrl()
 
 const healthOk = computed(() => health.value?.configured === true)
 const openApiUrl = computed(() => skillOpenApiUrl())
 
 const refreshHealth = async () => {
   loadingHealth.value = true
-  try { health.value = await difyHealth() } catch (e) { runError.value = e.message } finally { loadingHealth.value = false }
+  try { health.value = await difyBridgeHealth() } catch (e) { runError.value = e.message } finally { loadingHealth.value = false }
 }
 
 const runWorkflow = async () => {
@@ -108,7 +113,7 @@ const runWorkflow = async () => {
   try {
     let inputs = {}
     try { inputs = JSON.parse(inputsJson.value) } catch { throw new Error('inputs 不是合法 JSON') }
-    result.value = await runDifyWorkflow({
+    result.value = await runDifyBridgeWorkflow({
       workflowId: workflowId.value || undefined,
       inputs,
       user: user.value || undefined
@@ -155,6 +160,8 @@ input, .editor { width: 100%; box-sizing: border-box; padding: 7px 10px; border:
 .err { margin-top: 8px; color: #b01a1a; font-size: 13px; }
 .action-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
 .link-btn { background: #1f9b9b; color: white; text-decoration: none; padding: 6px 12px; border-radius: 6px; font-size: 13px; }
+.link-btn.secondary { background: #334155; }
+.official-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 10px 0 12px; color: #64748b; font-size: 13px; }
 .path { background: white; border: 1px solid #d8dde6; border-radius: 4px; padding: 2px 6px; font-family: monospace; font-size: 12px; word-break: break-all; color: #555; }
 .result-summary { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
 .badge { padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; background: #e5e8f0; color: #555; }
