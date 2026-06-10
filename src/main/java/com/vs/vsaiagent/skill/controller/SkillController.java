@@ -1,5 +1,7 @@
 package com.vs.vsaiagent.skill.controller;
 
+import com.vs.vsaiagent.observability.enums.ExecutionStageType;
+import com.vs.vsaiagent.observability.service.ExecutionTraceRecorder;
 import com.vs.vsaiagent.observability.vo.ApiResponse;
 import com.vs.vsaiagent.skill.Skill;
 import com.vs.vsaiagent.skill.SkillContext;
@@ -31,9 +33,11 @@ import java.util.Map;
 public class SkillController {
 
     private final SkillRegistry skillRegistry;
+    private final ExecutionTraceRecorder traceRecorder;
 
-    public SkillController(SkillRegistry skillRegistry) {
+    public SkillController(SkillRegistry skillRegistry, ExecutionTraceRecorder traceRecorder) {
         this.skillRegistry = skillRegistry;
+        this.traceRecorder = traceRecorder;
     }
 
     @GetMapping
@@ -60,8 +64,24 @@ public class SkillController {
         }
         SkillContext ctx = SkillContext.builder().build();
         Map<String, Object> args = arguments == null ? Map.of() : arguments;
+        long startedAt = System.currentTimeMillis();
+        String requestId = traceRecorder.start("skill.execute:" + name, args, "skill");
         log.info("[skill-controller] execute skill={} args={}", name, args.keySet());
-        SkillResult result = skill.execute(args, ctx);
-        return ApiResponse.success(result);
+        try {
+            SkillResult result = skill.execute(args, ctx);
+            traceRecorder.stage(requestId, ExecutionStageType.TOOL, "skill_execute", name,
+                    args, result, result.elapsedMs(), result.success(), result.errorMessage());
+            if (result.success()) {
+                traceRecorder.success(requestId, result, startedAt);
+            } else {
+                traceRecorder.fail(requestId, result.errorMessage(), startedAt);
+            }
+            return ApiResponse.success(result);
+        } catch (Exception e) {
+            traceRecorder.stage(requestId, ExecutionStageType.ERROR, "skill_execute_error", name,
+                    args, null, System.currentTimeMillis() - startedAt, false, e.getMessage());
+            traceRecorder.fail(requestId, e, startedAt);
+            throw e;
+        }
     }
 }

@@ -1,5 +1,7 @@
 package com.vs.vsaiagent.tools;
 
+import com.vs.vsaiagent.observability.service.ExecutionLogService;
+import com.vs.vsaiagent.observability.tool.LoggingToolCallback;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbacks;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +20,12 @@ public class ToolRegistration {
     @Value("${image-api.api-key}")
     private String imageApiKey;
 
+    private final ExecutionLogService executionLogService;
+
+    public ToolRegistration(ExecutionLogService executionLogService) {
+        this.executionLogService = executionLogService;
+    }
+
     @Bean
     public ToolCallback[] allTools() {
         FileOperationTool fileOperationTool = new FileOperationTool();
@@ -28,7 +36,7 @@ public class ToolRegistration {
         TerminalOperationTool terminalOperationTool = new TerminalOperationTool();
         PDFGenerationTool pdfGenerationTool = new PDFGenerationTool();
         TerminateTool terminateTool = new TerminateTool();
-        return ToolCallbacks.from(
+        ToolCallback[] callbacks = ToolCallbacks.from(
                 fileOperationTool,
                 webSearchTool,
                 webScrapingTool,
@@ -38,5 +46,10 @@ public class ToolRegistration {
                 pdfGenerationTool,
                 terminateTool
         );
+        ToolCallback[] wrapped = new ToolCallback[callbacks.length];
+        for (int i = 0; i < callbacks.length; i++) {
+            wrapped[i] = new LoggingToolCallback(callbacks[i], executionLogService);
+        }
+        return wrapped;
     }
 }

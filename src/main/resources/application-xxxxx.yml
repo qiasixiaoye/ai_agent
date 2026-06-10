@@ -45,7 +45,7 @@ springdoc:
   group-configs:
     - group: 'default'
       paths-to-match: '/**'
-      packages-to-scan: com.vs.vsaiagent.controller
+      packages-to-scan: com.vs.vsaiagent
 # knife4j config
 knife4j:
   enable: true
@@ -62,3 +62,27 @@ search-api:
 
 image-api:
   api-key: xxxx
+
+app:
+  # dashscope: use Spring AI Alibaba DashScope auto-configuration
+  # deepseek: use OpenAI-compatible config below
+  llm:
+    provider: dashscope
+  dify:
+    base-url:
+    api-key:
+    default-workflow-id:
+    timeout-ms: 60000
+  kb:
+    dashscope:
+      index: assistant_kb
+
+# Optional OpenAI-compatible model config, used when app.llm.provider=deepseek.
+# spring:
+#   ai:
+#     openai:
+#       api-key: xxxx
+#       base-url: https://api.deepseek.com
+#       chat:
+#         options:
+#           model: deepseek-chat

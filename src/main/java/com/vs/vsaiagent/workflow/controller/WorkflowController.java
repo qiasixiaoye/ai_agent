@@ -5,7 +5,10 @@ import com.vs.vsaiagent.eval.EvalCase;
 import com.vs.vsaiagent.eval.EvalJudge;
 import com.vs.vsaiagent.eval.SuiteResult;
 import com.vs.vsaiagent.eval.judge.KeywordContainsJudge;
+import com.vs.vsaiagent.observability.enums.ExecutionStageType;
+import com.vs.vsaiagent.observability.service.ExecutionTraceRecorder;
 import com.vs.vsaiagent.observability.vo.ApiResponse;
+import com.vs.vsaiagent.workflow.StepResult;
 import com.vs.vsaiagent.workflow.WorkflowDef;
 import com.vs.vsaiagent.workflow.WorkflowResult;
 import com.vs.vsaiagent.workflow.runner.WorkflowEvalRunner;
@@ -49,6 +52,7 @@ public class WorkflowController {
     private final WorkflowRegistry registry;
     private final DifyDslExporter difyExporter;
     private final WorkflowEvalRunner workflowEvalRunner;
+    private final ExecutionTraceRecorder traceRecorder;
     private final Map<String, EvalJudge> judges = new java.util.HashMap<>();
 
     public WorkflowController(WorkflowGenerator generator,
@@ -56,12 +60,14 @@ public class WorkflowController {
                               WorkflowRegistry registry,
                               DifyDslExporter difyExporter,
                               WorkflowEvalRunner workflowEvalRunner,
+                              ExecutionTraceRecorder traceRecorder,
                               List<EvalJudge> judgeList) {
         this.generator = generator;
         this.executor = executor;
         this.registry = registry;
         this.difyExporter = difyExporter;
         this.workflowEvalRunner = workflowEvalRunner;
+        this.traceRecorder = traceRecorder;
         for (EvalJudge j : judgeList) judges.put(j.name(), j);
     }
 
@@ -90,13 +96,19 @@ public class WorkflowController {
         if (req == null || req.getPrompt() == null || req.getPrompt().isBlank()) {
             return ApiResponse.fail("prompt 不能为空");
         }
+        long startedAt = System.currentTimeMillis();
+        String requestId = traceRecorder.start("workflow.generate", req.getPrompt(), "workflow-generator");
         try {
             WorkflowDef def = generator.generate(req.getPrompt());
             registry.save(def);
+            traceRecorder.stage(requestId, ExecutionStageType.MODEL, "generate_workflow", null,
+                    req.getPrompt(), def, System.currentTimeMillis() - startedAt, true, null);
+            traceRecorder.success(requestId, def, startedAt);
             log.info("[workflow] generated id={} name={} nodes={}", def.id(), def.name(), def.nodes().size());
             return ApiResponse.success(def);
         } catch (Exception e) {
             log.warn("[workflow] generate failed", e);
+            traceRecorder.fail(requestId, e, startedAt);
             return ApiResponse.fail(e.getMessage());
         }
     }
@@ -117,8 +129,28 @@ public class WorkflowController {
     public ApiResponse<WorkflowResult> execute(@PathVariable String id, @RequestBody ExecuteRequest req) {
         WorkflowDef def = registry.find(id).orElse(null);
         if (def == null) return ApiResponse.fail("workflow not found: " + id);
-        WorkflowResult r = executor.execute(def, req == null ? "" : req.getInput());
-        return ApiResponse.success(r);
+        String input = req == null ? "" : req.getInput();
+        long startedAt = System.currentTimeMillis();
+        String requestId = traceRecorder.start("workflow.execute:" + id, input, "workflow");
+        try {
+            WorkflowResult r = executor.execute(def, input);
+            for (StepResult step : r.steps()) {
+                ExecutionStageType stageType = "llm".equalsIgnoreCase(step.type())
+                        ? ExecutionStageType.MODEL
+                        : ExecutionStageType.TOOL;
+                traceRecorder.stage(requestId, stageType, "workflow_node:" + step.nodeId(), step.type(),
+                        step.input(), step.output(), step.elapsedMs(), step.success(), step.errorMessage());
+            }
+            if (r.success()) {
+                traceRecorder.success(requestId, r, startedAt);
+            } else {
+                traceRecorder.fail(requestId, r.errorMessage(), startedAt);
+            }
+            return ApiResponse.success(r);
+        } catch (Exception e) {
+            traceRecorder.fail(requestId, e, startedAt);
+            throw e;
+        }
     }
 
     @PostMapping("/{id}/eval")
@@ -130,12 +162,14 @@ public class WorkflowController {
         if (judge == null) return ApiResponse.fail("no judge available");
 
         long start = System.currentTimeMillis();
+        String requestId = traceRecorder.start("workflow.eval:" + id, req, judgeName);
         List<CaseResult> caseResults = new ArrayList<>();
         int pass = 0, fail = 0;
 
         workflowEvalRunner.setCurrent(id);
         try {
-            for (EvalCaseDto c : (req == null ? List.<EvalCaseDto>of() : req.getCases())) {
+            List<EvalCaseDto> cases = req == null || req.getCases() == null ? List.of() : req.getCases();
+            for (EvalCaseDto c : cases) {
                 String chatId = "wf-eval-" + id + "-" + UUID.randomUUID();
                 EvalCase ec = new EvalCase(c.getId(), c.getInput(),
                         c.getExpectedContains(), c.getRubric(), List.of());
@@ -155,9 +189,14 @@ public class WorkflowController {
 
                 CaseResult enriched = new CaseResult(cr.caseId(), cr.input(), cr.actualOutput(),
                         cr.pass(), cr.reason(), cr.missedKeywords(), re, je);
+                traceRecorder.stage(requestId, ExecutionStageType.TOOL, "eval_case:" + c.getId(), judge.name(),
+                        ec, enriched, re + je, enriched.pass(), enriched.pass() ? null : enriched.reason());
                 caseResults.add(enriched);
                 if (enriched.pass()) pass++; else fail++;
             }
+        } catch (Exception e) {
+            traceRecorder.fail(requestId, e, start);
+            throw e;
         } finally {
             workflowEvalRunner.clearCurrent();
         }
@@ -172,6 +211,7 @@ public class WorkflowController {
                 System.currentTimeMillis() - start,
                 caseResults
         );
+        traceRecorder.success(requestId, sr, start);
         return ApiResponse.success(sr);
     }
 

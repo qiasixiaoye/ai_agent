@@ -1,0 +1,10 @@
+target/*
+!target/vs-ai-agent-0.0.1-SNAPSHOT.jar
+vs-agent-web/node_modules
+vs-image-search-mcp-server/target
+.git
+.idea
+.vscode
+*.log
+tmp
+tmp-vs-ai-agent-container.jar
