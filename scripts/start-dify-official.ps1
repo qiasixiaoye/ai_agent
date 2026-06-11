@@ -40,10 +40,15 @@ try {
         }
 
         $envText = Get-Content -Raw -Encoding UTF8 ".env"
-        $envText = $envText -replace "(?m)^EXPOSE_WEB_PORT=.*$", "EXPOSE_WEB_PORT=$WebPort"
-        if ($envText -notmatch "(?m)^EXPOSE_WEB_PORT=") {
-            $envText += "`nEXPOSE_WEB_PORT=$WebPort`n"
+        $envText = $envText -replace "(?m)^EXPOSE_NGINX_PORT=.*$", "EXPOSE_NGINX_PORT=$WebPort"
+        if ($envText -notmatch "(?m)^EXPOSE_NGINX_PORT=") {
+            $envText += "`nEXPOSE_NGINX_PORT=$WebPort`n"
         }
+        $envText = $envText -replace "(?m)^EXPOSE_NGINX_SSL_PORT=.*$", "EXPOSE_NGINX_SSL_PORT=3443"
+        $envText = $envText -replace "(?m)^CONSOLE_API_URL=.*$", "CONSOLE_API_URL=http://localhost:$WebPort"
+        $envText = $envText -replace "(?m)^CONSOLE_WEB_URL=.*$", "CONSOLE_WEB_URL=http://localhost:$WebPort"
+        $envText = $envText -replace "(?m)^SERVICE_API_URL=.*$", "SERVICE_API_URL=http://localhost:$WebPort"
+        $envText = $envText -replace "(?m)^APP_WEB_URL=.*$", "APP_WEB_URL=http://localhost:$WebPort"
         Set-Content -Encoding UTF8 ".env" $envText
 
         docker compose up -d

@@ -16,7 +16,18 @@ powershell -ExecutionPolicy Bypass -File .\scripts\start-dify-official.ps1
 http://localhost:3001
 ```
 
+脚本会写入官方 Docker Compose 使用的 `EXPOSE_NGINX_PORT=3001`，因此入口是 Dify 官方 Nginx 服务，不是本项目的 `vs-dify-bridge` 页面。
+
 如果 GitHub 网络不可用，脚本会在 `git clone https://github.com/langgenius/dify.git` 处失败。网络恢复后重新执行即可。
+
+如果 Docker Hub 拉取 `langgenius/dify-api` 长时间卡住，可以从已克隆的官方仓库本地构建：
+
+```powershell
+cd .\runtime\dify\dify
+docker build -f api\Dockerfile -t langgenius/dify-api:1.14.2 .
+cd .\docker
+docker compose up -d --no-build
+```
 
 ## 接入当前系统
 
