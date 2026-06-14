@@ -233,7 +233,7 @@ onMounted(refreshList)
 
 <style scoped>
 .wf-container { display: flex; flex-direction: column; height: 100vh; background: #f5f7fb; color: #222; }
-.wf-header { display: flex; align-items: center; padding: 12px 20px; background: #2b6dbf; color: white; }
+.wf-header { display: flex; align-items: center; padding: 12px 20px; background: var(--color-primary); color: white; }
 .wf-header h1 { margin: 0 auto; font-size: 1.4rem; }
 .back-link { color: white; text-decoration: none; display: flex; align-items: center; }
 .back-link span { font-size: 1.2rem; margin-right: 5px; }
@@ -251,15 +251,15 @@ label { display: block; font-size: 12px; color: #555; margin: 8px 0 4px; }
 textarea, input, select, .editor { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #d0d7e2; border-radius: 6px; font-size: 13px; font-family: inherit; }
 textarea, .editor { resize: vertical; font-family: monospace; font-size: 12.5px; }
 
-.primary-btn { margin-top: 12px; background: #2b6dbf; color: white; border: none; border-radius: 6px; padding: 8px 18px; font-size: 14px; cursor: pointer; }
-.primary-btn:hover:not(:disabled) { background: #20559b; }
+.primary-btn { margin-top: 12px; background: var(--color-primary); color: white; border: none; border-radius: 6px; padding: 8px 18px; font-size: 14px; cursor: pointer; }
+.primary-btn:hover:not(:disabled) { background: var(--color-primary-dark); }
 .primary-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .err { color: #b01a1a; font-size: 13px; margin-top: 8px; }
 
 .wf-list { list-style: none; padding: 0; margin: 0; }
 .wf-item { padding: 8px 10px; border-radius: 6px; margin-bottom: 4px; cursor: pointer; border: 1px solid transparent; }
 .wf-item:hover { background: #f0f4fb; }
-.wf-item.active { background: #e3edff; border-color: #2b6dbf; }
+.wf-item.active { background: var(--color-primary-light); border-color: var(--color-primary); }
 .wf-name { font-weight: 600; color: #2a3a55; font-size: 13px; }
 .wf-desc { font-size: 11px; color: #6c7a99; }
 .wf-meta { margin-top: 4px; display: flex; gap: 6px; align-items: center; }
@@ -270,16 +270,16 @@ textarea, .editor { resize: vertical; font-family: monospace; font-size: 12.5px;
 .nodes { display: flex; flex-direction: column; gap: 8px; }
 .node { border: 1px solid #e5e8f0; border-radius: 6px; padding: 8px 10px; }
 .node-head { display: flex; gap: 8px; align-items: center; font-size: 12px; }
-.step { background: #2b6dbf; color: white; border-radius: 50%; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; }
+.step { background: var(--color-primary); color: white; border-radius: 50%; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; }
 .node-id { background: #eef0f5; padding: 1px 5px; border-radius: 3px; }
 .ntype { font-size: 10px; padding: 1px 6px; border-radius: 3px; font-weight: 600; }
-.ntype.llm { background: #e3edff; color: #2b6dbf; }
+.ntype.llm { background: var(--color-primary-light); color: var(--color-primary); }
 .ntype.skill { background: #fff0e0; color: #b06000; }
 .output { color: #8a96b3; font-family: monospace; font-size: 11px; }
 .node-body { margin-top: 6px; font-size: 12px; color: #444; }
 .node-body pre { background: #f7f9fc; border-radius: 4px; padding: 8px; margin: 4px 0 0; white-space: pre-wrap; word-break: break-word; font-size: 12px; }
 
-.link-btn { background: #2b6dbf; color: white; text-decoration: none; padding: 4px 10px; border-radius: 4px; font-size: 12px; }
+.link-btn { background: var(--color-primary); color: white; text-decoration: none; padding: 4px 10px; border-radius: 4px; font-size: 12px; }
 .exec-result { margin-top: 12px; }
 .result-summary { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .badge { padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; background: #eef0f5; color: #555; }

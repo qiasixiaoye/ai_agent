@@ -199,7 +199,7 @@ const handleFailQuery = async () => {
   display: flex;
   align-items: center;
   padding: 12px 20px;
-  background: #1f2937;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
   color: #fff;
 }
 
@@ -254,7 +254,7 @@ button {
   height: 36px;
   border: none;
   border-radius: 6px;
-  background: #2563eb;
+  background: var(--color-primary);
   color: #fff;
   padding: 0 12px;
   cursor: pointer;

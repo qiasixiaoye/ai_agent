@@ -181,14 +181,14 @@ onMounted(refreshWorkflows)
 }
 
 .back-link {
-  color: #2563eb;
+  color: var(--color-primary);
   text-decoration: none;
   font-weight: 700;
 }
 
 .eyebrow {
   margin: 0 0 6px;
-  color: #4338ca;
+  color: var(--color-primary);
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
@@ -225,8 +225,8 @@ select {
 }
 
 .primary-btn {
-  border: 1px solid #4338ca;
-  background: #4338ca;
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
   color: #ffffff;
   padding: 0 14px;
   cursor: pointer;

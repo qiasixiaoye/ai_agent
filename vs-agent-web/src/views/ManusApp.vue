@@ -227,7 +227,7 @@ const sendMessage = async (message) => {
   display: flex;
   align-items: center;
   padding: 10px 20px;
-  background-color: #4a6fa5;
+  background-color: var(--color-primary);
   color: white;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }

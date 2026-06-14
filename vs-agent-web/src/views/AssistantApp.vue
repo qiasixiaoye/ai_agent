@@ -191,7 +191,7 @@ const sendMessage = async (message) => {
   display: flex;
   align-items: center;
   padding: 10px 20px;
-  background-color: #4a6fa5;
+  background-color: var(--color-primary);
   color: white;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
@@ -237,8 +237,8 @@ const sendMessage = async (message) => {
 .rag-toggle {
   display: flex;
   align-items: center;
-  background-color: #e7f1ff;
-  color: #4a6fa5;
+  background-color: var(--color-primary-light);
+  color: var(--color-primary);
   border-radius: 18px;
   padding: 6px 12px;
   font-size: 14px;
@@ -249,7 +249,7 @@ const sendMessage = async (message) => {
 }
 
 .rag-toggle.active {
-  background-color: #3498db;
+  background-color: var(--color-primary);
   color: white;
 }
 

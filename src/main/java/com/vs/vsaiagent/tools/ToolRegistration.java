@@ -2,6 +2,9 @@ package com.vs.vsaiagent.tools;
 
 import com.vs.vsaiagent.observability.service.ExecutionLogService;
 import com.vs.vsaiagent.observability.tool.LoggingToolCallback;
+import com.vs.vsaiagent.tools.astro.CloudCoverTool;
+import com.vs.vsaiagent.tools.astro.LightPollutionTool;
+import com.vs.vsaiagent.tools.astro.MilkyWayRiseTool;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbacks;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,6 +39,9 @@ public class ToolRegistration {
         TerminalOperationTool terminalOperationTool = new TerminalOperationTool();
         PDFGenerationTool pdfGenerationTool = new PDFGenerationTool();
         TerminateTool terminateTool = new TerminateTool();
+        MilkyWayRiseTool milkyWayRiseTool = new MilkyWayRiseTool();
+        LightPollutionTool lightPollutionTool = new LightPollutionTool();
+        CloudCoverTool cloudCoverTool = new CloudCoverTool();
         ToolCallback[] callbacks = ToolCallbacks.from(
                 fileOperationTool,
                 webSearchTool,
@@ -44,7 +50,10 @@ public class ToolRegistration {
                 resourceDownloadTool,
                 terminalOperationTool,
                 pdfGenerationTool,
-                terminateTool
+                terminateTool,
+                milkyWayRiseTool,
+                lightPollutionTool,
+                cloudCoverTool
         );
         ToolCallback[] wrapped = new ToolCallback[callbacks.length];
         for (int i = 0; i < callbacks.length; i++) {

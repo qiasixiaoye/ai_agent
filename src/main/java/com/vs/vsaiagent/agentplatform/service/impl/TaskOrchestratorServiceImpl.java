@@ -99,6 +99,47 @@ public class TaskOrchestratorServiceImpl implements TaskOrchestratorService {
         return execute(request);
     }
 
+    @Override
+    public TaskExecuteResult runAstroPhotoFlow(double latitude, double longitude, String date) {
+        List<TaskStepDefinition> steps = List.of(
+                TaskStepDefinition.builder()
+                        .stepId("s1")
+                        .toolName("milkyway_rise")
+                        .args(Map.of("latitude", latitude, "longitude", longitude, "date", date))
+                        .required(true)
+                        .build(),
+                TaskStepDefinition.builder()
+                        .stepId("s2")
+                        .toolName("light_pollution")
+                        .args(Map.of("latitude", latitude, "longitude", longitude))
+                        .required(true)
+                        .build(),
+                TaskStepDefinition.builder()
+                        .stepId("s3")
+                        .toolName("cloud_cover")
+                        .args(Map.of("latitude", latitude, "longitude", longitude, "date", date))
+                        .required(false)
+                        .build(),
+                TaskStepDefinition.builder()
+                        .stepId("s4")
+                        .toolName("astro_plan_summary")
+                        .args(Map.of(
+                                "milkyWayResult", "${step:s1}",
+                                "lightPollutionResult", "${step:s2}",
+                                "cloudCoverResult", "${step:s3}",
+                                "location", latitude + "," + longitude,
+                                "date", date
+                        ))
+                        .required(true)
+                        .build()
+        );
+        TaskExecuteRequest request = new TaskExecuteRequest();
+        request.setTraceId(UUID.randomUUID().toString());
+        request.setMaxSteps(6);
+        request.setSteps(steps);
+        return execute(request);
+    }
+
     private Map<String, Object> resolveArgs(Map<String, Object> rawArgs, TaskExecutionContext context) {
         Map<String, Object> resolved = new LinkedHashMap<>();
         if (rawArgs == null) {

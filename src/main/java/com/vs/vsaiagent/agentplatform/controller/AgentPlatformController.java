@@ -1,5 +1,6 @@
 package com.vs.vsaiagent.agentplatform.controller;
 
+import com.vs.vsaiagent.agentplatform.dto.AstroDemoRequest;
 import com.vs.vsaiagent.agentplatform.dto.DemoTaskRequest;
 import com.vs.vsaiagent.agentplatform.dto.ToolInvokeRequest;
 import com.vs.vsaiagent.agentplatform.model.TaskExecuteRequest;
@@ -108,6 +109,27 @@ public class AgentPlatformController {
         String requestId = traceRecorder.start("agent-platform.demo-task", safeRequest, "task-orchestrator");
         try {
             TaskExecuteResult result = taskOrchestratorService.runDemoFlow(safeRequest.getQuery() == null ? "" : safeRequest.getQuery());
+            logTaskStages(requestId, safeRequest, result);
+            finishTaskTrace(requestId, result, startedAt);
+            return AgentApiResponse.success(result);
+        } catch (Exception e) {
+            traceRecorder.fail(requestId, e, startedAt);
+            throw e;
+        }
+    }
+
+    @PostMapping("/tasks/astro-demo")
+    public AgentApiResponse<TaskExecuteResult> executeAstroDemoTask(@RequestBody AstroDemoRequest request) {
+        AstroDemoRequest safeRequest = request == null ? new AstroDemoRequest() : request;
+        double latitude = safeRequest.getLatitude() == null ? 39.9042 : safeRequest.getLatitude();
+        double longitude = safeRequest.getLongitude() == null ? 116.4074 : safeRequest.getLongitude();
+        String date = (safeRequest.getDate() == null || safeRequest.getDate().isBlank())
+                ? java.time.LocalDate.now().toString()
+                : safeRequest.getDate();
+        long startedAt = System.currentTimeMillis();
+        String requestId = traceRecorder.start("agent-platform.astro-demo-task", safeRequest, "task-orchestrator");
+        try {
+            TaskExecuteResult result = taskOrchestratorService.runAstroPhotoFlow(latitude, longitude, date);
             logTaskStages(requestId, safeRequest, result);
             finishTaskTrace(requestId, result, startedAt);
             return AgentApiResponse.success(result);

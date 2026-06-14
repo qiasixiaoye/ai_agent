@@ -69,10 +69,15 @@ app:
   llm:
     provider: dashscope
   dify:
-    base-url:
-    api-key:
+    base-url:             # 运行 workflow 用，官方 compose 部署后为 http://localhost:3001
+    api-key:              # Dify 应用的 app-xxx key
     default-workflow-id:
     timeout-ms: 60000
+    console:              # DSL 自动导入用（workflow-builder /import 接口）
+      base-url:           # 同上，如 http://localhost:3001
+      email:              # Dify 控制台登录邮箱
+      password:
+      access-token:       # 可选：直接填 console token 则跳过 email/password 登录
   kb:
     dashscope:
       index: assistant_kb

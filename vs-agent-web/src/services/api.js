@@ -79,6 +79,8 @@ export const executePlatformTool = async (toolName, args, traceId) =>
   unwrap(await api.post(`/agent-platform/tools/${encodeURIComponent(toolName)}/execute`, { traceId, arguments: args || {} }))
 export const executePlatformTask = async (task) => unwrap(await api.post('/agent-platform/tasks/execute', task, { timeout: 600000 }))
 export const executePlatformDemoTask = async (query) => unwrap(await api.post('/agent-platform/tasks/demo', { query }, { timeout: 600000 }))
+export const runAstroDemo = async ({ latitude, longitude, date } = {}) =>
+  unwrap(await api.post('/agent-platform/tasks/astro-demo', { latitude, longitude, date }, { timeout: 600000 }))
 
 // ---------------- Dify ----------------
 

@@ -7,4 +7,6 @@ public interface TaskOrchestratorService {
     TaskExecuteResult execute(TaskExecuteRequest request);
 
     TaskExecuteResult runDemoFlow(String query);
+
+    TaskExecuteResult runAstroPhotoFlow(double latitude, double longitude, String date);
 }
