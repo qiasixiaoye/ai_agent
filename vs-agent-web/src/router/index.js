@@ -1,18 +1,23 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import WorkbenchLayout from '../layouts/WorkbenchLayout.vue'
+
+const workbenchChildren = [
+  { path: '', name: 'ChatWorkspace', component: () => import('../views/workbench/ChatWorkspace.vue'), meta: { area: 'chat' } },
+  { path: 'chat', redirect: '/' },
+  { path: 'tools', name: 'ToolsWorkspace', component: () => import('../views/workbench/ToolsWorkspace.vue'), meta: { area: 'tools' } },
+  { path: 'skills', name: 'SkillsWorkspace', component: () => import('../views/workbench/SkillsWorkspace.vue'), meta: { area: 'skills' } },
+  { path: 'runtime', name: 'RuntimeWorkspace', component: () => import('../views/workbench/RuntimeWorkspace.vue'), meta: { area: 'runtime' } },
+  { path: 'memory', name: 'MemoryWorkspace', component: () => import('../views/workbench/MemoryWorkspace.vue'), meta: { area: 'memory' } },
+  { path: 'workflow-studio', name: 'WorkflowWorkspace', component: () => import('../views/workbench/WorkflowWorkspace.vue'), meta: { area: 'workflow' } },
+  { path: 'knowledge-base', name: 'KnowledgeWorkspace', component: () => import('../views/workbench/KnowledgeWorkspace.vue'), meta: { area: 'knowledge' } },
+  { path: 'observability', name: 'ObservabilityWorkspace', component: () => import('../views/workbench/ObservabilityWorkspace.vue'), meta: { area: 'observability' } }
+]
 
 const routes = [
-  { path: '/',                name: 'Home',          component: () => import('../views/Home.vue') },
-  // ① 用 Agent（普通 / RAG / 智能体三模式合并在对话页）
-  { path: '/assistant-app',   name: 'AssistantApp',  component: () => import('../views/AssistantApp.vue') },
-  // ② 配能力
-  { path: '/agent-platform',  name: 'AgentPlatform', component: () => import('../views/AgentPlatform.vue') },
-  { path: '/skills',          name: 'Skills',        component: () => import('../views/Skills.vue') },
-  { path: '/runtime',         name: 'RuntimeManagement', component: () => import('../views/RuntimeManagement.vue') },
-  { path: '/knowledge-base',  name: 'KnowledgeBase', component: () => import('../views/KnowledgeBase.vue') },
-  // ③ 产工作流（一句话 → Dify 画布，交给 dify-builder）
-  { path: '/workflow-studio', name: 'WorkflowStudio', component: () => import('../views/WorkflowStudio.vue') },
-  // 横切：可观测
-  { path: '/observability',   name: 'Observability', component: () => import('../views/Observability.vue') }
+  { path: '/', component: WorkbenchLayout, children: workbenchChildren },
+  { path: '/assistant-app', redirect: '/' },
+  { path: '/agent-platform', redirect: '/tools' },
+  { path: '/:pathMatch(.*)*', redirect: '/' }
 ]
 
 const router = createRouter({
