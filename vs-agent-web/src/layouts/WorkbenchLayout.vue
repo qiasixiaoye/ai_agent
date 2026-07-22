@@ -15,21 +15,46 @@ import { useRoute, useRouter, RouterView } from 'vue-router'
 import AppRail from '../components/workbench/AppRail.vue'
 import CommandBar from '../components/workbench/CommandBar.vue'
 import InspectorPanel from '../components/workbench/InspectorPanel.vue'
+import { useChatStore } from '../stores/chat'
 import { WORKBENCH_AREAS, useWorkbenchStore } from '../stores/workbench'
+import { persistWorkbenchSession, restoreWorkbenchSession } from '../utils/workbenchSession'
 
 const route = useRoute()
 const router = useRouter()
+const chatStore = useChatStore()
 const workbench = useWorkbenchStore()
 const commandQuery = ref('')
 const areas = WORKBENCH_AREAS
+const persistenceReady = ref(false)
 
 const runtimeStatus = computed(() => 'unknown')
 const runtimeLabel = computed(() => '运行环境待检测')
+
+restoreWorkbenchSession({ chatStore, workbench })
+persistenceReady.value = true
 
 watch(
   () => route.meta.area,
   (area) => workbench.setActiveArea(area || 'chat'),
   { immediate: true }
+)
+
+watch(
+  () => ({
+    currentConversationId: workbench.currentConversationId,
+    currentMode: workbench.currentMode,
+    activeArea: workbench.activeArea,
+    inspectorOpen: workbench.inspectorOpen,
+    chats: chatStore.assistantAppChats
+  }),
+  () => {
+    if (!persistenceReady.value) return
+    persistWorkbenchSession({
+      workbench: workbench.$state,
+      chats: chatStore.assistantAppChats
+    })
+  },
+  { deep: true }
 )
 
 const runCommand = () => {

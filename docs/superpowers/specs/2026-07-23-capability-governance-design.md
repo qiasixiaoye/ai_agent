@@ -44,6 +44,20 @@ Each capability can declare:
 
 The evaluation contract is intentionally lightweight in Phase 1. It creates a stable structure for future automated eval runners without blocking existing tools.
 
+## Positive and Negative Examples
+
+The example library is capability-type oriented rather than tied to the current registry. It includes hypothetical tools and Skills so the system can evaluate risks before a concrete implementation exists.
+
+Examples cover:
+
+- positive deterministic tool calls;
+- negative prompt-injection or parameter-injection calls;
+- high-risk command/write/delete calls that must be blocked or confirmed;
+- positive creative Skill outputs;
+- negative creative Skill requests that ask the system to fabricate metrics or production claims.
+
+This keeps the evaluation set useful for newly introduced capabilities, not only the four bundled Skills.
+
 ## Audit Rules
 
 The audit service reports issues when:
@@ -69,7 +83,8 @@ The page should show:
 - review/lifecycle status;
 - audit issue count and issue detail.
 
+Workbench session persistence should be owned by the layout-level shell. A page-level chat component is too narrow because refreshing a non-chat route skips the restore path.
+
 ## Interview Talking Point
 
 The key interview answer is: “I separated capability governance into registration-time contracts, runtime policy decisions, evaluation attribution, and lifecycle feedback. This lets an Agent product scale from a few tools to many Skills without losing control over permissions, side effects, quality, and failure attribution.”
-

@@ -10,14 +10,21 @@ import org.springframework.web.bind.annotation.RestController;
 public class CapabilityGovernanceController {
 
     private final CapabilityGovernanceService governanceService;
+    private final CapabilityEvalExampleService exampleService;
 
-    public CapabilityGovernanceController(CapabilityGovernanceService governanceService) {
+    public CapabilityGovernanceController(CapabilityGovernanceService governanceService,
+                                          CapabilityEvalExampleService exampleService) {
         this.governanceService = governanceService;
+        this.exampleService = exampleService;
     }
 
     @GetMapping("/audit")
     public ApiResponse<CapabilityAuditReport> audit() {
         return ApiResponse.success(governanceService.audit());
     }
-}
 
+    @GetMapping("/examples")
+    public ApiResponse<CapabilityEvalExampleReport> examples() {
+        return ApiResponse.success(exampleService.generate());
+    }
+}

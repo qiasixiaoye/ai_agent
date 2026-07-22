@@ -4,6 +4,7 @@ import { buildCapabilityCatalog, capabilityStats } from '../src/utils/capability
 import { parseJsonObject, streamClosureStatus } from '../src/utils/streamLifecycle.js'
 import { localizedDescription, productErrorMessage } from '../src/utils/productText.js'
 import { buildWorkbenchSnapshot, restoreWorkbenchSnapshot } from '../src/utils/workbenchPersistence.js'
+import { applyWorkbenchSnapshotToStores, shouldPersistWorkbenchChats } from '../src/utils/workbenchSession.js'
 
 test('an SSE closure after response content completes the message', () => {
   assert.equal(streamClosureStatus('A streamed response'), 'complete')
@@ -118,4 +119,42 @@ test('workbench persistence restores the active session without storing unbounde
   const restored = restoreWorkbenchSnapshot(JSON.stringify(snapshot))
   assert.equal(restored.currentConversationId, 'conv-1')
   assert.equal(restored.conversations[0].messages.length, 40)
+})
+
+test('workbench session restore is layout-level and independent of the chat page', () => {
+  const snapshot = restoreWorkbenchSnapshot(JSON.stringify({
+    version: 1,
+    currentConversationId: 'conv-capabilities',
+    currentMode: 'agent',
+    activeArea: 'capabilities',
+    ui: { inspectorOpen: true },
+    conversations: [{
+      id: 'conv-capabilities',
+      title: '刷新后仍然存在',
+      mode: 'agent',
+      createdAt: '2026-07-23T00:00:00.000Z',
+      updatedAt: '2026-07-23T00:00:00.000Z',
+      messages: [{ id: 'm1', content: 'hello', isUser: true, timestamp: '2026-07-23T00:00:00.000Z' }]
+    }]
+  }))
+  const chatStore = {
+    hydrated: [],
+    hydrateAssistantAppChats(conversations) {
+      this.hydrated = conversations
+    }
+  }
+  const workbench = {
+    currentConversationId: '',
+    restored: null,
+    restorePersistedState(payload) {
+      this.restored = payload
+      this.currentConversationId = payload.currentConversationId
+    }
+  }
+
+  assert.equal(applyWorkbenchSnapshotToStores(snapshot, { chatStore, workbench }), true)
+  assert.equal(workbench.currentConversationId, 'conv-capabilities')
+  assert.equal(chatStore.hydrated[0].messages[0].content, 'hello')
+  assert.equal(shouldPersistWorkbenchChats({}), false)
+  assert.equal(shouldPersistWorkbenchChats({ 'conv-capabilities': { id: 'conv-capabilities', messages: [] } }), true)
 })

@@ -177,6 +177,25 @@
             <p v-else class="audit-clean">当前能力没有命中契约审计问题。</p>
           </section>
 
+          <section class="example-panel">
+            <div class="audit-title">
+              <div>
+                <strong>正负样例库</strong>
+                <span>用于评估设计，不局限于当前已有工具</span>
+              </div>
+              <small>{{ governanceExamples?.total || 0 }} 条</small>
+            </div>
+            <ul v-if="examplePreview.length" class="example-list">
+              <li v-for="example in examplePreview" :key="`${example.capabilityName}:${example.category}`">
+                <strong>{{ example.positive ? '正例' : '负例' }} · {{ example.category }}</strong>
+                <span>{{ example.capabilityName }}</span>
+                <code>{{ example.input }}</code>
+                <small>{{ example.expectedOutcome }}</small>
+              </li>
+            </ul>
+            <p v-else class="audit-clean">{{ governanceExamplesError || '暂无样例。' }}</p>
+          </section>
+
           <PermissionNotice
             v-if="capabilityRisk !== 'safe'"
             :risk="capabilityRisk"
@@ -217,7 +236,12 @@
 import { computed, onMounted, ref } from 'vue'
 import PermissionNotice from '../../components/workbench/PermissionNotice.vue'
 import WorkbenchSection from '../../components/workbench/WorkbenchSection.vue'
-import { executePlatformTool, getCapabilityGovernanceAudit, listPlatformTools } from '../../services/api'
+import {
+  executePlatformTool,
+  getCapabilityGovernanceAudit,
+  getCapabilityGovernanceExamples,
+  listPlatformTools
+} from '../../services/api'
 import { useRuntimeStore } from '../../stores/runtime'
 import { useSkillsStore } from '../../stores/skills'
 import { useWorkbenchStore } from '../../stores/workbench'
@@ -248,6 +272,8 @@ const lastResult = ref(null)
 const managedConfirmed = ref(false)
 const governanceAudit = ref(null)
 const governanceAuditError = ref('')
+const governanceExamples = ref(null)
+const governanceExamplesError = ref('')
 
 const loading = computed(() => platformLoading.value || runtime.loading || skills.loading)
 const invoking = computed(() => platformExecuting.value || runtime.invoking || skills.executing)
@@ -272,6 +298,7 @@ const auditIssuesForSelected = computed(() => {
     issue.capabilityType === auditType && issue.capabilityName === selected.name
   )
 })
+const examplePreview = computed(() => (governanceExamples.value?.examples || []).slice(0, 5))
 const capabilityRisk = computed(() => {
   const level = selectedCapability.value?.permission?.level
   if (level === 'blocked') return 'blocked'
@@ -380,11 +407,22 @@ const loadGovernanceAudit = async () => {
   }
 }
 
+const loadGovernanceExamples = async () => {
+  try {
+    governanceExamples.value = await getCapabilityGovernanceExamples()
+    governanceExamplesError.value = ''
+  } catch (error) {
+    governanceExamples.value = null
+    governanceExamplesError.value = productErrorMessage(error, '能力评估样例')
+  }
+}
+
 const reloadAll = async () => {
   actionError.value = ''
   await Promise.allSettled([
     loadPlatformTools(),
     loadGovernanceAudit(),
+    loadGovernanceExamples(),
     skills.loadSkills(),
     runtime.loadHealth(),
     runtime.loadTools()
@@ -478,6 +516,7 @@ onMounted(reloadAll)
 .detail-grid dd { margin: 0; color: var(--color-text); }
 .detail-grid code { display: inline-flex; margin: 0 6px 6px 0; padding: 3px 7px; color: var(--color-primary); background: rgba(90, 167, 255, .10); border: 1px solid rgba(90, 167, 255, .22); border-radius: 8px; }
 .governance-audit { display: grid; gap: 12px; padding: 14px; background: linear-gradient(135deg, rgba(24, 189, 188, .08), rgba(90, 167, 255, .06)); border: 1px solid rgba(90, 167, 255, .22); border-radius: var(--radius-md); }
+.example-panel { display: grid; gap: 12px; padding: 14px; background: rgba(255,255,255,.035); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
 .audit-title { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
 .audit-title div { display: grid; gap: 3px; }
 .audit-title span, .audit-title small, .audit-clean { color: var(--color-text-muted); font-size: .78rem; }
@@ -487,6 +526,10 @@ onMounted(reloadAll)
 .audit-issue-list li { display: grid; gap: 3px; padding: 9px 10px; background: rgba(216, 168, 79, .08); border: 1px solid rgba(216, 168, 79, .24); border-radius: var(--radius-sm); }
 .audit-issue-list span { color: var(--color-text); font-size: .82rem; }
 .audit-issue-list small { color: var(--color-text-muted); }
+.example-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.example-list li { display: grid; gap: 5px; padding: 9px 10px; background: rgba(0,0,0,.14); border: 1px solid var(--color-border); border-radius: var(--radius-sm); }
+.example-list span, .example-list small { color: var(--color-text-muted); }
+.example-list code { width: fit-content; max-width: 100%; overflow-wrap: anywhere; white-space: pre-wrap; padding: 4px 7px; color: var(--color-primary); background: rgba(90,167,255,.10); border: 1px solid rgba(90,167,255,.22); border-radius: 8px; }
 .detail-panel label { color: var(--color-text-muted); font-size: .8rem; font-weight: 700; }
 .action-row { display: flex; align-items: center; gap: 10px; }
 .detail-panel pre { max-height: 360px; margin: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 12px; color: var(--color-text); background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: .78rem; }

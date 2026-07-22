@@ -40,11 +40,6 @@ import {
   connectToAssistantAppRagChat,
   connectToManusChat
 } from '../../services/api'
-import {
-  buildWorkbenchSnapshot,
-  readWorkbenchSnapshot,
-  writeWorkbenchSnapshot
-} from '../../utils/workbenchPersistence'
 
 const modeOptions = [
   { value: 'normal', label: '普通对话' },
@@ -61,44 +56,18 @@ const loading = ref(false)
 const eventSource = ref(null)
 const messagesContainer = ref(null)
 const lastUserMessage = ref('')
-const persistenceReady = ref(false)
 let agentHistory = []
 
 const messages = computed(() => chatStore.assistantAppChats[chatId.value]?.messages || [])
 
 watch(mode, (value) => workbench.setMode(value), { immediate: true })
-watch(
-  () => ({
-    currentConversationId: workbench.currentConversationId,
-    currentMode: workbench.currentMode,
-    activeArea: workbench.activeArea,
-    inspectorOpen: workbench.inspectorOpen,
-    chats: chatStore.assistantAppChats
-  }),
-  () => {
-    if (!persistenceReady.value) return
-    writeWorkbenchSnapshot(buildWorkbenchSnapshot({
-      workbench: workbench.$state,
-      chats: chatStore.assistantAppChats
-    }))
-  },
-  { deep: true }
-)
 
 onMounted(() => {
-  const persisted = readWorkbenchSnapshot()
-  if (persisted) {
-    chatStore.hydrateAssistantAppChats(persisted.conversations)
-    workbench.restorePersistedState(persisted)
-    mode.value = persisted.currentMode || mode.value
-  }
-
   const existingChatId = workbench.currentConversationId
   if (existingChatId && chatStore.assistantAppChats[existingChatId]) {
     chatId.value = existingChatId
     workbench.setConversation(chatId.value)
     if (mode.value === 'agent') rebuildAgentHistory()
-    persistenceReady.value = true
     return
   }
 
@@ -109,11 +78,6 @@ onMounted(() => {
     isUser: false,
     status: 'complete'
   })
-  persistenceReady.value = true
-  writeWorkbenchSnapshot(buildWorkbenchSnapshot({
-    workbench: workbench.$state,
-    chats: chatStore.assistantAppChats
-  }))
 })
 
 onUnmounted(() => eventSource.value?.close())
