@@ -36,6 +36,24 @@ steps:
 examples:
   - 耶加雪菲 浅烘 的风味笔记
 timeoutMs: 5000
+security:
+  riskLevel: low
+  permissionScopes: [local_compute]
+  sideEffects: none
+  dataSensitivity: user_input
+  requiresConfirmation: false
+  reviewStatus: reviewed
+  lifecycleStatus: active
+evaluation:
+  profile: creative
+  successCriteria:
+    - 输出风味轮廓、酸苦平衡和冲煮建议
+    - 内容符合用户输入的产地和烘焙程度
+  hardConstraints:
+    - 不调用外部网络
+    - 不写入本地文件
+  goldenCaseTags: [normal, boundary]
+  attributionStages: [execution, integration]
 sourceType: LOCAL
 ---
 

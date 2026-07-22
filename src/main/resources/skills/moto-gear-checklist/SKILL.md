@@ -38,6 +38,24 @@ steps:
 examples:
   - 夏季 5 天摩旅的装备清单
 timeoutMs: 5000
+security:
+  riskLevel: low
+  permissionScopes: [local_compute]
+  sideEffects: none
+  dataSensitivity: user_input
+  requiresConfirmation: false
+  reviewStatus: reviewed
+  lifecycleStatus: active
+evaluation:
+  profile: functional
+  successCriteria:
+    - 输出护具、衣物、工具、电子设备和证件清单
+    - 根据季节和天数调整装备
+  hardConstraints:
+    - 不调用外部网络
+    - 不写入本地文件
+  goldenCaseTags: [normal, boundary]
+  attributionStages: [execution, integration]
 sourceType: LOCAL
 ---
 

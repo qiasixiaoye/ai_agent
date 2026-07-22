@@ -1,5 +1,7 @@
 package com.vs.vsaiagent.skill.loader;
 
+import com.vs.vsaiagent.capability.governance.CapabilityEvaluationContract;
+import com.vs.vsaiagent.capability.governance.CapabilitySecurityContract;
 import com.vs.vsaiagent.skill.SkillMetadata;
 import com.vs.vsaiagent.skill.SkillParam;
 import com.vs.vsaiagent.skill.SkillSourceType;
@@ -90,6 +92,8 @@ public final class SkillMdParser {
                 .inputs(toParams(root.get("inputs")))
                 .outputs(toParams(root.get("outputs")))
                 .steps(toSteps(root.get("steps")))
+                .security(toSecurity(root.get("security")))
+                .evaluation(toEvaluation(root.get("evaluation")))
                 .instructions(instructions);
 
         Object timeout = root.get("timeoutMs");
@@ -105,6 +109,36 @@ public final class SkillMdParser {
             }
         }
         return b.build();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static CapabilitySecurityContract toSecurity(Object o) {
+        if (!(o instanceof Map<?, ?> m)) return null;
+        Map<String, Object> map = (Map<String, Object>) m;
+        return CapabilitySecurityContract.builder()
+                .riskLevel(str(map.get("riskLevel")))
+                .permissionScopes(toStringList(map.get("permissionScopes")))
+                .sideEffects(str(map.get("sideEffects")))
+                .dataSensitivity(str(map.get("dataSensitivity")))
+                .requiresConfirmation(bool(map.get("requiresConfirmation")))
+                .reviewStatus(str(map.get("reviewStatus")))
+                .lifecycleStatus(str(map.get("lifecycleStatus")))
+                .allowedDomains(toStringList(map.get("allowedDomains")))
+                .allowedPaths(toStringList(map.get("allowedPaths")))
+                .build();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static CapabilityEvaluationContract toEvaluation(Object o) {
+        if (!(o instanceof Map<?, ?> m)) return null;
+        Map<String, Object> map = (Map<String, Object>) m;
+        return CapabilityEvaluationContract.builder()
+                .profile(str(map.get("profile")))
+                .successCriteria(toStringList(map.get("successCriteria")))
+                .hardConstraints(toStringList(map.get("hardConstraints")))
+                .goldenCaseTags(toStringList(map.get("goldenCaseTags")))
+                .attributionStages(toStringList(map.get("attributionStages")))
+                .build();
     }
 
     @SuppressWarnings("unchecked")
@@ -156,5 +190,11 @@ public final class SkillMdParser {
 
     private static String str(Object o) {
         return o == null ? null : o.toString();
+    }
+
+    private static Boolean bool(Object o) {
+        if (o == null) return null;
+        if (o instanceof Boolean b) return b;
+        return Boolean.parseBoolean(o.toString());
     }
 }

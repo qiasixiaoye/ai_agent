@@ -153,6 +153,30 @@
             </div>
           </dl>
 
+          <section class="governance-audit">
+            <div class="audit-title">
+              <div>
+                <strong>治理审计</strong>
+                <span>安全契约、权限范围、效果评估和上线状态</span>
+              </div>
+              <small>{{ auditIssuesForSelected.length }} 个问题</small>
+            </div>
+            <div class="audit-contract-grid">
+              <span>风险：{{ governanceContract.riskLevel || '未声明' }}</span>
+              <span>权限：{{ governanceContract.permissionScopes?.length ? governanceContract.permissionScopes.join(' / ') : '未声明' }}</span>
+              <span>评估：{{ governanceContract.evaluationProfile || '未声明' }}</span>
+              <span>状态：{{ governanceContract.reviewStatus || 'UNREVIEWED' }} · {{ governanceContract.lifecycleStatus || 'ACTIVE' }}</span>
+            </div>
+            <ul v-if="auditIssuesForSelected.length" class="audit-issue-list">
+              <li v-for="issue in auditIssuesForSelected" :key="`${issue.capabilityType}:${issue.capabilityName}:${issue.category}:${issue.message}`">
+                <strong>{{ auditSeverityLabel(issue.severity) }} · {{ issue.category }}</strong>
+                <span>{{ issue.message }}</span>
+                <small>{{ issue.recommendation }}</small>
+              </li>
+            </ul>
+            <p v-else class="audit-clean">当前能力没有命中契约审计问题。</p>
+          </section>
+
           <PermissionNotice
             v-if="capabilityRisk !== 'safe'"
             :risk="capabilityRisk"
@@ -193,7 +217,7 @@
 import { computed, onMounted, ref } from 'vue'
 import PermissionNotice from '../../components/workbench/PermissionNotice.vue'
 import WorkbenchSection from '../../components/workbench/WorkbenchSection.vue'
-import { executePlatformTool, listPlatformTools } from '../../services/api'
+import { executePlatformTool, getCapabilityGovernanceAudit, listPlatformTools } from '../../services/api'
 import { useRuntimeStore } from '../../stores/runtime'
 import { useSkillsStore } from '../../stores/skills'
 import { useWorkbenchStore } from '../../stores/workbench'
@@ -222,6 +246,8 @@ const jsonError = ref('')
 const actionError = ref('')
 const lastResult = ref(null)
 const managedConfirmed = ref(false)
+const governanceAudit = ref(null)
+const governanceAuditError = ref('')
 
 const loading = computed(() => platformLoading.value || runtime.loading || skills.loading)
 const invoking = computed(() => platformExecuting.value || runtime.invoking || skills.executing)
@@ -236,6 +262,15 @@ const selectedCapability = computed(() => {
   const item = catalog.value.find((entry) => entry.id === selectedCapabilityId.value) || catalog.value[0] || null
   if (item?.kind === 'skill' && skills.selected?.name === item.name) return { ...item, ...normalizeSkill(skills.selected) }
   return item
+})
+const governanceContract = computed(() => selectedCapability.value?.governanceContract || {})
+const auditIssuesForSelected = computed(() => {
+  const selected = selectedCapability.value
+  if (!selected || !governanceAudit.value?.issues) return []
+  const auditType = selected.kind === 'skill' ? 'skill' : 'tool'
+  return governanceAudit.value.issues.filter((issue) =>
+    issue.capabilityType === auditType && issue.capabilityName === selected.name
+  )
 })
 const capabilityRisk = computed(() => {
   const level = selectedCapability.value?.permission?.level
@@ -298,6 +333,12 @@ const sourceLabel = (item) => ({
   MCP_MANAGED: '受管 MCP'
 }[item?.sourceType] || item?.sourceType || '未知来源')
 
+const auditSeverityLabel = (severity) => ({
+  HIGH: '高风险',
+  WARN: '需补齐',
+  INFO: '提示'
+}[severity] || severity || '提示')
+
 const resetInvocation = () => {
   argumentsJson.value = '{}'
   jsonError.value = ''
@@ -329,10 +370,21 @@ const loadPlatformTools = async () => {
   }
 }
 
+const loadGovernanceAudit = async () => {
+  try {
+    governanceAudit.value = await getCapabilityGovernanceAudit()
+    governanceAuditError.value = ''
+  } catch (error) {
+    governanceAudit.value = null
+    governanceAuditError.value = productErrorMessage(error, '能力治理审计')
+  }
+}
+
 const reloadAll = async () => {
   actionError.value = ''
   await Promise.allSettled([
     loadPlatformTools(),
+    loadGovernanceAudit(),
     skills.loadSkills(),
     runtime.loadHealth(),
     runtime.loadTools()
@@ -425,6 +477,16 @@ onMounted(reloadAll)
 .detail-grid dt { margin-bottom: 6px; color: var(--color-text-muted); font-size: .78rem; }
 .detail-grid dd { margin: 0; color: var(--color-text); }
 .detail-grid code { display: inline-flex; margin: 0 6px 6px 0; padding: 3px 7px; color: var(--color-primary); background: rgba(90, 167, 255, .10); border: 1px solid rgba(90, 167, 255, .22); border-radius: 8px; }
+.governance-audit { display: grid; gap: 12px; padding: 14px; background: linear-gradient(135deg, rgba(24, 189, 188, .08), rgba(90, 167, 255, .06)); border: 1px solid rgba(90, 167, 255, .22); border-radius: var(--radius-md); }
+.audit-title { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.audit-title div { display: grid; gap: 3px; }
+.audit-title span, .audit-title small, .audit-clean { color: var(--color-text-muted); font-size: .78rem; }
+.audit-contract-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.audit-contract-grid span { padding: 8px 10px; color: var(--color-text); background: rgba(0,0,0,.16); border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: .78rem; }
+.audit-issue-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.audit-issue-list li { display: grid; gap: 3px; padding: 9px 10px; background: rgba(216, 168, 79, .08); border: 1px solid rgba(216, 168, 79, .24); border-radius: var(--radius-sm); }
+.audit-issue-list span { color: var(--color-text); font-size: .82rem; }
+.audit-issue-list small { color: var(--color-text-muted); }
 .detail-panel label { color: var(--color-text-muted); font-size: .8rem; font-weight: 700; }
 .action-row { display: flex; align-items: center; gap: 10px; }
 .detail-panel pre { max-height: 360px; margin: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 12px; color: var(--color-text); background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: .78rem; }
@@ -440,6 +502,6 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 @media (max-width: 720px) {
   .capability-workspace { padding: 14px; }
   .workspace-hero { flex-direction: column; }
-  .metric-grid, .toolbar, .detail-grid { grid-template-columns: 1fr; }
+  .metric-grid, .toolbar, .detail-grid, .audit-contract-grid { grid-template-columns: 1fr; }
 }
 </style>

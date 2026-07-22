@@ -34,6 +34,26 @@ steps:
 examples:
   - 生成 hello.pdf，内容为 hello world
 timeoutMs: 30000
+security:
+  riskLevel: high
+  permissionScopes: [local_compute, file_write]
+  sideEffects: local_file
+  dataSensitivity: user_input
+  requiresConfirmation: true
+  reviewStatus: reviewed
+  lifecycleStatus: active
+  allowedPaths:
+    - FILE_SAVE_DIR/pdf
+evaluation:
+  profile: deterministic
+  successCriteria:
+    - 返回生成后的 PDF 文件路径
+    - 文件名和内容参数非空时执行成功
+  hardConstraints:
+    - 只写入允许的 PDF 输出目录
+    - 不执行系统命令
+  goldenCaseTags: [normal, boundary, exception]
+  attributionStages: [call, execution, integration]
 sourceType: LOCAL
 ---
 

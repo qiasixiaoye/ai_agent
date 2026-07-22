@@ -1,5 +1,7 @@
 package com.vs.vsaiagent.agentplatform.model;
 
+import com.vs.vsaiagent.capability.governance.CapabilityEvaluationContract;
+import com.vs.vsaiagent.capability.governance.CapabilitySecurityContract;
 import lombok.Builder;
 import lombok.Data;
 
@@ -15,4 +17,6 @@ public class ToolMetadata {
     private List<String> tags;
     private List<String> requiredParams;
     private Long timeoutMs;
+    private CapabilitySecurityContract security;
+    private CapabilityEvaluationContract evaluation;
 }

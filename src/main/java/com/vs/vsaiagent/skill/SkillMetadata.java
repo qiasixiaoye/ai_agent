@@ -1,5 +1,8 @@
 package com.vs.vsaiagent.skill;
 
+import com.vs.vsaiagent.capability.governance.CapabilityEvaluationContract;
+import com.vs.vsaiagent.capability.governance.CapabilitySecurityContract;
+
 import java.util.Collections;
 import java.util.List;
 
@@ -23,7 +26,9 @@ public record SkillMetadata(
         /** SKILL.md 正文（front-matter 之后的 markdown），即技能的「操作手册」。这是 Skill 区别于裸工具的内部知识。 */
         String instructions,
         /** 技能的有序内部步骤；步骤可引用(调用)其它工具/技能，体现 Skill 是「过程」而非单点函数。 */
-        List<SkillStep> steps
+        List<SkillStep> steps,
+        CapabilitySecurityContract security,
+        CapabilityEvaluationContract evaluation
 ) {
 
     /** 紧凑构造器：把可空集合归一化为空 List，避免下游写 null 检查 */
@@ -61,6 +66,8 @@ public record SkillMetadata(
         private SkillSourceType sourceType;
         private String instructions;
         private List<SkillStep> steps;
+        private CapabilitySecurityContract security;
+        private CapabilityEvaluationContract evaluation;
 
         public Builder name(String v) { this.name = v; return this; }
         public Builder displayName(String v) { this.displayName = v; return this; }
@@ -74,10 +81,12 @@ public record SkillMetadata(
         public Builder sourceType(SkillSourceType v) { this.sourceType = v; return this; }
         public Builder instructions(String v) { this.instructions = v; return this; }
         public Builder steps(List<SkillStep> v) { this.steps = v; return this; }
+        public Builder security(CapabilitySecurityContract v) { this.security = v; return this; }
+        public Builder evaluation(CapabilityEvaluationContract v) { this.evaluation = v; return this; }
 
         public SkillMetadata build() {
             return new SkillMetadata(name, displayName, description, version,
-                    tags, inputs, outputs, examples, timeoutMs, sourceType, instructions, steps);
+                    tags, inputs, outputs, examples, timeoutMs, sourceType, instructions, steps, security, evaluation);
         }
     }
 }

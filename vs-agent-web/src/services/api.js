@@ -92,6 +92,7 @@ export const rebuildKbIndex = async () => unwrap(await api.post('/kb/documents/i
 
 export const listEvalSuites = async () => unwrap(await api.get('/eval/suites'))
 export const runEvalSuite = async (name) => unwrap(await api.post(`/eval/run/${encodeURIComponent(name)}`, {}, { timeout: 600000 }))
+export const getCapabilityGovernanceAudit = async () => unwrap(await api.get('/capability-governance/audit'))
 
 // ---------------- Agent Platform ----------------
 

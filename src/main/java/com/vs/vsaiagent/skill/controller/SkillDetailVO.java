@@ -1,5 +1,7 @@
 package com.vs.vsaiagent.skill.controller;
 
+import com.vs.vsaiagent.capability.governance.CapabilityEvaluationContract;
+import com.vs.vsaiagent.capability.governance.CapabilitySecurityContract;
 import com.vs.vsaiagent.skill.SkillMetadata;
 import com.vs.vsaiagent.skill.SkillParam;
 import com.vs.vsaiagent.skill.SkillSourceType;
@@ -25,6 +27,8 @@ public class SkillDetailVO {
     private List<SkillParam> outputs;
     private List<String> examples;
     private Long timeoutMs;
+    private CapabilitySecurityContract security;
+    private CapabilityEvaluationContract evaluation;
     /** 技能操作手册（SKILL.md 正文），让调用方看到 Skill 的内部知识，而非只看到一个函数签名。 */
     private String instructions;
     /** 技能的有序内部步骤（可引用工具/技能），体现 Skill 是「过程」而非单点接口。 */
@@ -42,6 +46,8 @@ public class SkillDetailVO {
                 .outputs(md.outputs())
                 .examples(md.examples())
                 .timeoutMs(md.timeoutMs())
+                .security(md.security())
+                .evaluation(md.evaluation())
                 .instructions(md.instructions())
                 .steps(md.steps())
                 .build();

@@ -52,14 +52,17 @@ const functionGroupFor = ({ name, tags, sourceType, kind }) => {
 }
 
 const permissionFor = ({ name, tags, sourceType, kind, raw }) => {
-  const risk = String(raw?.riskLevel || raw?.risk || '').toLowerCase()
-  const confirmationRequired = raw?.confirmationRequired === true
+  const security = raw?.security || {}
+  const risk = String(raw?.riskLevel || raw?.risk || security.riskLevel || '').toLowerCase()
+  const confirmationRequired = raw?.confirmationRequired === true || security.requiresConfirmation === true
+  const scopes = Array.isArray(security.permissionScopes) ? security.permissionScopes : []
+  const highRiskScope = scopes.some((scope) => ['FILE_WRITE', 'EXTERNAL_WRITE', 'SYSTEM_COMMAND', 'PRIVATE_DATA', 'PAYMENT', 'DEPLOY'].includes(String(scope).toUpperCase()))
   const enabled = raw?.enabled !== false
   const circuitOpen = String(raw?.circuitState || '').toUpperCase() === 'OPEN'
   if (!enabled || circuitOpen) {
     return { level: 'blocked', label: '已阻止', scope: '策略阻止', reason: circuitOpen ? '熔断器已打开。' : '能力当前未启用。' }
   }
-  if (sourceType === 'MCP' || sourceType === 'MCP_MANAGED' || tags.includes('mcp') || confirmationRequired || risk.includes('high')) {
+  if (sourceType === 'MCP' || sourceType === 'MCP_MANAGED' || tags.includes('mcp') || confirmationRequired || risk.includes('high') || highRiskScope) {
     return { level: 'confirm', label: '调用前确认', scope: '外部或受管能力', reason: '可能路由到外部工具或受治理策略影响，执行前需要确认。' }
   }
   if (hasTag(tags, 'file', 'document') || /pdf|file|document/i.test(name)) {
@@ -75,6 +78,18 @@ const dependentToolsFor = (name) => ({
   'astro-shoot-plan': ['milkyway_rise', 'light_pollution', 'cloud_cover']
 }[name] || [])
 
+const governanceFor = (raw = {}) => ({
+  security: raw.security || null,
+  evaluation: raw.evaluation || null,
+  riskLevel: raw.security?.riskLevel || raw.riskLevel || raw.risk || null,
+  permissionScopes: raw.security?.permissionScopes || [],
+  reviewStatus: raw.security?.reviewStatus || 'UNREVIEWED',
+  lifecycleStatus: raw.security?.lifecycleStatus || 'ACTIVE',
+  evaluationProfile: raw.evaluation?.profile || null,
+  successCriteria: raw.evaluation?.successCriteria || [],
+  goldenCaseTags: raw.evaluation?.goldenCaseTags || []
+})
+
 export const toolKey = (tool) => tool?.toolName || tool?.name || tool?.id || ''
 export const skillKey = (skill) => skill?.name || skill?.id || ''
 
@@ -84,6 +99,7 @@ export const normalizePlatformTool = (tool) => {
   const tags = normalizeTags(tool?.tags)
   const functionGroup = functionGroupFor({ name, tags, sourceType, kind: 'tool' })
   const permission = permissionFor({ name, tags, sourceType, kind: 'tool', raw: tool })
+  const governanceContract = governanceFor(tool)
   return {
     id: `tool:${name}`,
     kind: 'tool',
@@ -95,6 +111,7 @@ export const normalizePlatformTool = (tool) => {
     requiredParams: Array.isArray(tool?.requiredParams) ? tool.requiredParams : [],
     timeoutMs: tool?.timeoutMs,
     raw: tool,
+    governanceContract,
     category: sourceType === 'MCP' ? '外部 MCP' : '原子工具',
     functionGroup,
     permission,
@@ -110,6 +127,7 @@ export const normalizeSkill = (skill) => {
   const tags = normalizeTags(skill?.tags)
   const functionGroup = functionGroupFor({ name, tags, sourceType, kind: 'skill' })
   const permission = permissionFor({ name, tags, sourceType, kind: 'skill', raw: skill })
+  const governanceContract = governanceFor(skill)
   return {
     id: `skill:${name}`,
     kind: 'skill',
@@ -122,6 +140,7 @@ export const normalizeSkill = (skill) => {
     version: skill?.version,
     timeoutMs: skill?.timeoutMs,
     raw: skill,
+    governanceContract,
     category: '复合技能',
     functionGroup,
     permission,
@@ -137,6 +156,7 @@ export const normalizeManagedTool = (tool) => {
   const tags = normalizeTags(tool?.tags)
   const functionGroup = functionGroupFor({ name, tags, sourceType, kind: 'managed' })
   const permission = permissionFor({ name, tags, sourceType, kind: 'managed', raw: tool })
+  const governanceContract = governanceFor(tool)
   return {
     id: `managed:${name}`,
     kind: 'managed',
@@ -147,6 +167,7 @@ export const normalizeManagedTool = (tool) => {
     tags,
     requiredParams: [],
     raw: tool,
+    governanceContract,
     category: '受管 MCP',
     functionGroup,
     permission,

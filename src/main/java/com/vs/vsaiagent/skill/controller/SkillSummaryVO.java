@@ -1,5 +1,7 @@
 package com.vs.vsaiagent.skill.controller;
 
+import com.vs.vsaiagent.capability.governance.CapabilityEvaluationContract;
+import com.vs.vsaiagent.capability.governance.CapabilitySecurityContract;
 import com.vs.vsaiagent.skill.SkillMetadata;
 import com.vs.vsaiagent.skill.SkillSourceType;
 import lombok.Builder;
@@ -19,6 +21,8 @@ public class SkillSummaryVO {
     private String version;
     private List<String> tags;
     private SkillSourceType sourceType;
+    private CapabilitySecurityContract security;
+    private CapabilityEvaluationContract evaluation;
 
     public static SkillSummaryVO from(SkillMetadata md) {
         return SkillSummaryVO.builder()
@@ -28,6 +32,8 @@ public class SkillSummaryVO {
                 .version(md.version())
                 .tags(md.tags())
                 .sourceType(md.sourceType())
+                .security(md.security())
+                .evaluation(md.evaluation())
                 .build();
     }
 }

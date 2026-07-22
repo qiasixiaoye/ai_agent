@@ -43,6 +43,24 @@ steps:
 examples:
   - 纬度39.9 经度116.4 2026-06-25 的银河拍摄计划
 timeoutMs: 20000
+security:
+  riskLevel: medium
+  permissionScopes: [local_compute, external_read]
+  sideEffects: none
+  dataSensitivity: user_input
+  requiresConfirmation: false
+  reviewStatus: reviewed
+  lifecycleStatus: active
+evaluation:
+  profile: functional
+  successCriteria:
+    - 输出时间窗口、机位风险和执行建议
+    - 综合天文、光污染和云量结果
+  hardConstraints:
+    - 不写入本地文件
+    - 不执行系统命令
+  goldenCaseTags: [normal, boundary, adversarial]
+  attributionStages: [call, execution, integration]
 sourceType: LOCAL
 ---
 
