@@ -13,4 +13,5 @@
   --radius-sm: 4px;
   --radius-md: 8px;
   --shadow-panel: 0 10px 30px rgba(0, 0, 0, 0.28);
+  --shadow-focus: 0 0 0 3px rgba(90, 167, 255, 0.24);
 }

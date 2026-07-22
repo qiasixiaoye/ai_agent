@@ -58,6 +58,12 @@ const currentMode = computed(() => modeOptions.find((option) => option.value ===
 const messages = computed(() => chatStore.assistantAppChats[chatId.value]?.messages || [])
 
 onMounted(() => {
+  const existingChatId = workbench.currentConversationId
+  if (existingChatId && chatStore.assistantAppChats[existingChatId]) {
+    chatId.value = existingChatId
+    return
+  }
+
   chatId.value = chatStore.createAssistantAppChat()
   workbench.setConversation(chatId.value)
   chatStore.addAssistantAppMessage(chatId.value, 'Hello. What would you like to work on?', false)

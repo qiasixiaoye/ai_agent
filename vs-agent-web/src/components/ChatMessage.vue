@@ -37,8 +37,22 @@ const formattedTime = computed(() => {
   })
 })
 
+const escapeHtml = (value) => value
+  .replaceAll('&', '&amp;')
+  .replaceAll('<', '&lt;')
+  .replaceAll('>', '&gt;')
+  .replaceAll('"', '&quot;')
+  .replaceAll("'", '&#39;')
+
+const sanitizeHtml = (html) => html
+  .replace(/<(script|style|iframe|object|embed)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
+  .replace(/<(script|style|iframe|object|embed)\b[^>]*\/?\s*>/gi, '')
+  .replace(/\son\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+  .replace(/\s(href|src|xlink:href)\s*=\s*(["'])\s*javascript:[\s\S]*?\2/gi, ' $1="#"')
+  .replace(/\s(href|src|xlink:href)\s*=\s*javascript:[^\s>]+/gi, ' $1="#"')
+
 const formattedMessage = computed(() => {
-  return props.isUser ? props.content : marked(props.content)
+  return props.isUser ? escapeHtml(props.content) : sanitizeHtml(marked(props.content))
 })
 </script>
 

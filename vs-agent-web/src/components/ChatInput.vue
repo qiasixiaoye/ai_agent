@@ -66,7 +66,7 @@ const onSubmit = () => {
   color: var(--color-text);
 }
 .chat-input::placeholder { color: var(--color-text-subtle); }
-.chat-input:focus { border-color: var(--color-primary-soft); box-shadow: var(--glow-cyan); }
+.chat-input:focus { border-color: var(--color-primary); box-shadow: var(--shadow-focus); }
 
 .send-button {
   margin-left: 10px;
