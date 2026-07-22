@@ -34,12 +34,24 @@ export const useMemoryStore = defineStore('memory', {
       }
     },
     async previewContext(conversationId, query, tokenBudget = 2500) {
-      this.contextPreview = await previewConversationContext(conversationId, query, tokenBudget)
-      return this.contextPreview
+      try {
+        this.contextPreview = await previewConversationContext(conversationId, query, tokenBudget)
+        this.error = ''
+        return this.contextPreview
+      } catch (error) {
+        this.error = messageOf(error)
+        throw error
+      }
     },
     async loadDiagnostics(conversationId, query, mode = 'plain') {
-      this.diagnostics = await getContextDiagnostics(conversationId, query, mode)
-      return this.diagnostics
+      try {
+        this.diagnostics = await getContextDiagnostics(conversationId, query, mode)
+        this.error = ''
+        return this.diagnostics
+      } catch (error) {
+        this.error = messageOf(error)
+        throw error
+      }
     },
     suggestMemory({ userMessage, assistantMessage }) {
       const user = String(userMessage || '').trim()
@@ -69,6 +81,22 @@ export const useMemoryStore = defineStore('memory', {
         return result
       } catch (error) {
         this.suggestion.status = 'failed'
+        this.error = messageOf(error)
+        throw error
+      } finally {
+        this.writing = false
+      }
+    },
+    async writeManual(conversationId, { content, importance = 0.8 }) {
+      const text = String(content || '').trim()
+      if (!text) throw new Error('Memory content is required')
+      this.writing = true
+      try {
+        const result = await addSemanticMemory(conversationId, text, Math.min(1, Math.max(0, Number(importance) || 0)))
+        this.error = ''
+        await this.loadConversation(conversationId)
+        return result
+      } catch (error) {
         this.error = messageOf(error)
         throw error
       } finally {

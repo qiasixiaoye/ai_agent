@@ -38,12 +38,24 @@ export const useSkillsStore = defineStore('skills', {
       }
     },
     async previewRoute(query, topK = 3, threshold = 0.24) {
-      this.routePreview = await previewSkillRoute(query, topK, threshold)
-      return this.routePreview
+      try {
+        this.routePreview = await previewSkillRoute(query, topK, threshold)
+        this.error = ''
+        return this.routePreview
+      } catch (error) {
+        this.error = messageOf(error)
+        throw error
+      }
     },
     async evaluateRouting() {
-      this.evaluation = await evaluateSkillRouting()
-      return this.evaluation
+      try {
+        this.evaluation = await evaluateSkillRouting()
+        this.error = ''
+        return this.evaluation
+      } catch (error) {
+        this.error = messageOf(error)
+        throw error
+      }
     },
     async executeSelected(args) {
       if (!this.selected?.name) throw new Error('No Skill selected')

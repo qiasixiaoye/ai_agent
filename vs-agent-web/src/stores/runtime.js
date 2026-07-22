@@ -21,6 +21,11 @@ export const useRuntimeStore = defineStore('runtime', {
     status: (state) => state.health?.status || (state.error ? 'error' : 'unknown')
   },
   actions: {
+    normalizeArgumentsJson(value) {
+      if (!value || !value.trim()) return '{}'
+      JSON.parse(value)
+      return value
+    },
     async loadHealth() {
       try {
         this.health = await getMcpRuntimeHealth()
@@ -61,7 +66,8 @@ export const useRuntimeStore = defineStore('runtime', {
     async invokeTool({ toolName, argumentsJson, confirmed = false }) {
       this.invoking = true
       try {
-        this.lastResult = await invokeManagedMcpTool({ toolName, argumentsJson, confirmed })
+        const normalizedArgumentsJson = this.normalizeArgumentsJson(argumentsJson)
+        this.lastResult = await invokeManagedMcpTool({ toolName, argumentsJson: normalizedArgumentsJson, confirmed })
         this.error = ''
         return this.lastResult
       } catch (error) {

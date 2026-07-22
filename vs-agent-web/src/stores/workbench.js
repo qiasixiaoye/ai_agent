@@ -40,6 +40,7 @@ export const useWorkbenchStore = defineStore('workbench', {
       this.recentInvocations.unshift({
         id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
         createdAt: new Date().toISOString(),
+        status: 'complete',
         ...invocation
       })
       this.recentInvocations = this.recentInvocations.slice(0, 12)
