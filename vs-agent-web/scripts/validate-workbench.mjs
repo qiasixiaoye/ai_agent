@@ -34,6 +34,22 @@ for (const file of requiredFiles) {
   if (!existsSync(resolve(root, file))) failures.push(`missing ${file}`)
 }
 
+const exportChecks = {
+  'src/stores/runtime.js': ['useRuntimeStore'],
+  'src/stores/skills.js': ['useSkillsStore'],
+  'src/stores/memory.js': ['useMemoryStore'],
+  'src/stores/workbench.js': ['useWorkbenchStore', 'WORKBENCH_AREAS']
+}
+
+for (const [file, exports] of Object.entries(exportChecks)) {
+  const full = resolve(root, file)
+  if (!existsSync(full)) continue
+  const text = readFileSync(full, 'utf8')
+  for (const name of exports) {
+    if (!text.includes(`export const ${name}`)) failures.push(`${file} missing export ${name}`)
+  }
+}
+
 const routerPath = resolve(root, 'src/router/index.js')
 if (existsSync(routerPath)) {
   const router = readFileSync(routerPath, 'utf8')
