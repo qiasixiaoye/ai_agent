@@ -5,10 +5,7 @@
         <h1>AI 对话</h1>
         <p class="muted">普通对话、知识库问答和智能体模式共用同一个上下文。</p>
       </div>
-      <div class="header-actions">
-        <SegmentedControl v-model="mode" :options="modeOptions" />
-        <button type="button" class="primary-button" @click="createNewConversation">新建会话</button>
-      </div>
+      <SegmentedControl v-model="mode" :options="modeOptions" />
     </header>
 
     <div class="chat-body">
@@ -328,9 +325,8 @@ const sendMessage = (message) => {
 .workspace-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 22px; border-bottom: 1px solid var(--color-border); }
 .workspace-header h1 { margin: 0 0 4px; font-size: 1.25rem; }
 .workspace-header p { margin: 0; }
-.header-actions, .conversation-actions, .conversation-actions > div { display: flex; align-items: center; gap: 8px; }
-.primary-button, .text-button, .danger-button { border: 1px solid var(--color-border); border-radius: 8px; padding: 8px 11px; font: inherit; cursor: pointer; }
-.primary-button { border-color: var(--color-accent); background: var(--color-accent); color: #061426; }
+.conversation-actions, .conversation-actions > div { display: flex; align-items: center; gap: 8px; }
+.text-button, .danger-button { border: 1px solid var(--color-border); border-radius: 8px; padding: 8px 11px; font: inherit; cursor: pointer; }
 .text-button { background: transparent; color: var(--color-text); }
 .danger-button { background: transparent; color: #ff8f98; border-color: rgba(255, 143, 152, .36); }
 .chat-body { min-height: 0; display: grid; grid-template-columns: 238px minmax(0, 1fr); }
@@ -344,19 +340,19 @@ const sendMessage = (message) => {
 .conversation-item:hover, .conversation-item.active { border-color: var(--color-border); background: rgba(79, 155, 255, .12); }
 .conversation-item-title, .conversation-item-meta { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .conversation-item-title { font-size: .85rem; }
-.conversation-item-title span { color: var(--color-accent); font-size: .65rem; margin-right: 4px; }
+.conversation-item-title span { color: var(--color-primary); font-size: .65rem; margin-right: 4px; }
 .conversation-item-meta { margin-top: 4px; color: var(--color-muted); font-size: .7rem; }
 .conversation-main { min-height: 0; display: grid; grid-template-rows: auto minmax(220px, 1fr) auto; }
 .conversation-actions { justify-content: space-between; padding: 10px 18px; border-bottom: 1px solid var(--color-border); }
 .conversation-actions label { display: flex; align-items: center; gap: 6px; color: var(--color-muted); font-size: .8rem; }
 .conversation-actions select { border: 1px solid var(--color-border); border-radius: 7px; padding: 6px 8px; background: var(--color-panel); color: var(--color-text); font: inherit; }
 .chat-transcript { min-height: 0; overflow-y: auto; padding: 22px; }
-.empty-transcript { display: grid; gap: 6px; max-width: 520px; margin: 28px auto; padding: 20px; border: 1px dashed var(--color-border); border-radius: 12px; color: var(--color-muted); text-align: center; }
+.empty-transcript { display: grid; gap: 6px; max-width: 520px; margin: 28px auto; padding: 20px; border: 1px dashed var(--color-border); border-radius: 12px; color: var(--color-text-muted); text-align: center; }
 .empty-transcript strong { color: var(--color-text); }
 
 @media (max-width: 900px) {
   .chat-workspace { min-height: calc(100vh - 150px); border-radius: var(--radius-md); }
-  .workspace-header, .header-actions, .conversation-actions { align-items: flex-start; flex-direction: column; }
+  .workspace-header, .conversation-actions { align-items: flex-start; flex-direction: column; }
   .chat-body { grid-template-columns: 1fr; }
   .conversation-panel { max-height: 250px; border-right: 0; border-bottom: 1px solid var(--color-border); }
   .conversation-actions > div { flex-wrap: wrap; }
