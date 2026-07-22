@@ -63,6 +63,16 @@ if (existsSync(routerPath)) {
   }
 }
 
+const appText = readFileSync(resolve(root, 'src/App.vue'), 'utf8')
+if (appText.includes('background-color: #f0f2f5') || appText.includes('color: #333')) {
+  failures.push('App.vue still contains old light global style')
+}
+
+const routerText = readFileSync(resolve(root, 'src/router/index.js'), 'utf8')
+for (const legacyName of ['Home.vue', 'AssistantApp.vue', 'AgentPlatform.vue']) {
+  if (routerText.includes(legacyName)) failures.push(`router still imports legacy view ${legacyName}`)
+}
+
 const tokenPath = resolve(root, 'src/styles/tokens.css')
 if (existsSync(tokenPath)) {
   const tokens = readFileSync(tokenPath, 'utf8')
