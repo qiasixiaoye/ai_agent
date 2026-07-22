@@ -65,10 +65,10 @@ export const useRuntimeStore = defineStore('runtime', {
     riskForTool(tool) {
       if (!tool) return 'unknown'
       const risk = String(tool.riskLevel || tool.risk || '').toLowerCase()
-      const reason = String(tool.reason || '').trim().toLowerCase()
+      const reason = typeof tool.reason === 'string' ? tool.reason.trim().toLowerCase() : ''
       const circuitState = String(tool.circuitState || '').toLowerCase()
       if (circuitState === 'open') return 'blocked'
-      if (!reason || /(deny|denied|block|blocked|not\s+(?:included\s+in|in)\s+(?:the\s+)?allow)/.test(reason)) return 'blocked'
+      if (reason && /(deny|denied|block|blocked|not\s+(?:included\s+in|in)\s+(?:the\s+)?allow|blank\s+name)/.test(reason)) return 'blocked'
       if (tool.confirmationRequired === true) return 'confirm'
       if (tool.enabled === false) return 'blocked'
       if (risk.includes('high')) return 'confirm'
