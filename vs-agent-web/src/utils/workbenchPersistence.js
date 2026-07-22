@@ -35,6 +35,8 @@ const normalizeConversation = (conversation = {}) => {
     id: asString(conversation.id),
     title: truncate(titleSource, 80),
     mode: conversation.mode || selectedMessages.at(-1)?.mode || 'normal',
+    category: conversation.category || conversation.mode || selectedMessages.at(-1)?.mode || 'normal',
+    pinned: Boolean(conversation.pinned),
     createdAt: asString(conversation.createdAt, new Date().toISOString()),
     updatedAt: selectedMessages.at(-1)?.timestamp || asString(conversation.updatedAt, new Date().toISOString()),
     messages: selectedMessages

@@ -1,10 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { createPinia, setActivePinia } from 'pinia'
 import { buildCapabilityCatalog, capabilityStats } from '../src/utils/capabilityCatalog.js'
 import { parseJsonObject, streamClosureStatus } from '../src/utils/streamLifecycle.js'
 import { localizedDescription, productErrorMessage } from '../src/utils/productText.js'
 import { buildWorkbenchSnapshot, restoreWorkbenchSnapshot } from '../src/utils/workbenchPersistence.js'
 import { applyWorkbenchSnapshotToStores, shouldPersistWorkbenchChats } from '../src/utils/workbenchSession.js'
+import { useChatStore } from '../src/stores/chat.js'
 
 test('an SSE closure after response content completes the message', () => {
   assert.equal(streamClosureStatus('A streamed response'), 'complete')
@@ -119,6 +121,44 @@ test('workbench persistence restores the active session without storing unbounde
   const restored = restoreWorkbenchSnapshot(JSON.stringify(snapshot))
   assert.equal(restored.currentConversationId, 'conv-1')
   assert.equal(restored.conversations[0].messages.length, 40)
+})
+
+test('workbench persistence preserves conversation category and pin state', () => {
+  const snapshot = buildWorkbenchSnapshot({
+    workbench: { currentConversationId: 'conv-managed' },
+    chats: {
+      'conv-managed': {
+        id: 'conv-managed',
+        title: '研究 MCP',
+        mode: 'agent',
+        category: 'agent',
+        pinned: true,
+        messages: []
+      }
+    }
+  })
+
+  assert.equal(snapshot.conversations[0].category, 'agent')
+  assert.equal(snapshot.conversations[0].pinned, true)
+  const restored = restoreWorkbenchSnapshot(JSON.stringify(snapshot))
+  assert.equal(restored.conversations[0].category, 'agent')
+  assert.equal(restored.conversations[0].pinned, true)
+})
+
+test('clearing a conversation retains metadata while deleting removes it', () => {
+  setActivePinia(createPinia())
+  const chatStore = useChatStore()
+  const chatId = chatStore.createConversation('rag', { title: '知识整理', category: 'rag', pinned: true })
+  chatStore.addMessage(chatId, { content: '保留这条原始消息', isUser: true })
+
+  chatStore.clearConversation(chatId)
+  assert.equal(chatStore.assistantAppChats[chatId].title, '知识整理')
+  assert.equal(chatStore.assistantAppChats[chatId].category, 'rag')
+  assert.equal(chatStore.assistantAppChats[chatId].pinned, true)
+  assert.deepEqual(chatStore.assistantAppChats[chatId].messages, [])
+
+  assert.equal(chatStore.deleteConversation(chatId), true)
+  assert.equal(chatStore.assistantAppChats[chatId], undefined)
 })
 
 test('workbench session restore is layout-level and independent of the chat page', () => {
