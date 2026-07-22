@@ -1,14 +1,16 @@
 <template>
   <div class="chat-input-container">
-    <textarea 
+    <textarea
       ref="inputRef"
-      class="chat-input" 
-      v-model="message" 
-      placeholder="请输入您的消息..." 
+      v-model="message"
+      class="chat-input"
+      aria-label="Message"
+      placeholder="Message the assistant"
+      :disabled="loading"
       @keydown.enter.prevent="onSubmit"
     ></textarea>
-    <button class="send-button" @click="onSubmit" :disabled="!message.trim()">
-      发送
+    <button class="send-button" type="button" :disabled="loading || !message.trim()" @click="onSubmit">
+      Send
     </button>
   </div>
 </template>
@@ -17,109 +19,63 @@
 import { ref } from 'vue'
 
 const props = defineProps({
-  loading: {
-    type: Boolean,
-    default: false
-  }
+  loading: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['send'])
-
 const message = ref('')
 const inputRef = ref(null)
 
 const onSubmit = () => {
   if (!message.value.trim() || props.loading) return
-  
-  emit('send', message.value)
+
+  emit('send', message.value.trim())
   message.value = ''
-  
-  // 自动聚焦输入框
-  setTimeout(() => {
-    inputRef.value?.focus()
-  }, 0)
+  setTimeout(() => inputRef.value?.focus(), 0)
 }
 </script>
 
 <style scoped>
 .chat-input-container {
   display: flex;
-  padding: 12px;
-  background: rgba(12, 18, 34, 0.65);
-  backdrop-filter: blur(8px);
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--color-panel);
   border-top: 1px solid var(--color-border);
-  position: sticky;
-  bottom: 0;
 }
 
 .chat-input {
   flex: 1;
-  height: 44px;
-  padding: 12px 16px;
+  min-height: 42px;
+  max-height: 128px;
+  padding: 10px 12px;
   border: 1px solid var(--color-border);
-  border-radius: 22px;
+  border-radius: 6px;
   outline: none;
-  resize: none;
-  font-family: inherit;
-  font-size: 15px;
-  background: var(--color-surface);
+  resize: vertical;
+  font: inherit;
+  font-size: 0.9rem;
+  background: var(--color-panel-muted);
   color: var(--color-text);
 }
 .chat-input::placeholder { color: var(--color-text-subtle); }
 .chat-input:focus { border-color: var(--color-primary); box-shadow: var(--shadow-focus); }
 
 .send-button {
-  margin-left: 10px;
-  padding: 0 22px;
-  height: 44px;
-  background: var(--gradient-brand);
-  color: #04121a;
-  border: none;
-  border-radius: 22px;
+  height: 42px;
+  padding: 0 16px;
+  border: 1px solid var(--color-primary);
+  border-radius: 6px;
+  background: var(--color-primary);
+  color: var(--color-on-primary, #fff);
   cursor: pointer;
   font-weight: 700;
-  letter-spacing: 0.02em;
 }
+.send-button:hover { filter: brightness(1.06); }
+.send-button:disabled { background: var(--color-panel-muted); border-color: var(--color-border); color: var(--color-text-subtle); cursor: not-allowed; }
 
-.send-button:hover {
-  filter: brightness(1.1);
-  box-shadow: var(--shadow-focus);
-}
-
-.send-button:disabled {
-  background: var(--color-surface-alt);
-  color: var(--color-text-subtle);
-  cursor: not-allowed;
-}
-
-/* 移动端适配 */
-@media (max-width: 768px) {
-  .chat-input-container {
-    padding: 8px;
-  }
-  
-  .chat-input {
-    font-size: 15px;
-    padding: 10px;
-  }
-}
-
-/* 小屏幕移动设备适配 */
 @media (max-width: 480px) {
-  .chat-input-container {
-    padding: 6px;
-  }
-  
-  .chat-input {
-    height: 40px;
-    font-size: 14px;
-    padding: 8px 12px;
-  }
-  
-  .send-button {
-    padding: 0 15px;
-    height: 40px;
-    font-size: 14px;
-  }
+  .chat-input-container { padding: 10px; }
+  .send-button { padding: 0 12px; }
 }
 </style>

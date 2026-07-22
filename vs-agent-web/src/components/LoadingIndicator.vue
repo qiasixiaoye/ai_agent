@@ -1,5 +1,6 @@
 <template>
-  <div class="loading-indicator">
+  <div class="loading-indicator" role="status" aria-live="polite">
+    <span class="loading-label">Assistant is responding</span>
     <span class="dot"></span>
     <span class="dot"></span>
     <span class="dot"></span>
@@ -11,21 +12,24 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  padding: 10px 14px;
-  max-width: 60px;
-  background-color: var(--color-primary);
-  border-radius: 18px;
-  border-top-left-radius: 0;
+  gap: 4px;
+  padding: 6px 0;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
   margin-right: auto;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
+}
+
+.loading-label {
+  margin-right: 4px;
 }
 
 .dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: #999;
-  margin: 0 3px;
+  background-color: var(--color-primary);
+  margin: 0;
   opacity: 0.6;
   animation: pulse 1.5s infinite;
 }
@@ -48,4 +52,4 @@
     opacity: 1;
   }
 }
-</style> 
+</style>

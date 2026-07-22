@@ -8,29 +8,53 @@ export const useChatStore = defineStore('chat', {
   }),
 
   actions: {
-    createAssistantAppChat() {
+    createConversation(mode = 'normal') {
       const chatId = uuidv4()
       this.assistantAppChats[chatId] = {
         id: chatId,
-        messages: []
+        mode,
+        messages: [],
+        createdAt: new Date().toISOString()
       }
       return chatId
     },
 
-    addAssistantAppMessage(chatId, message, isUser = true) {
+    addMessage(chatId, payload) {
       if (!this.assistantAppChats[chatId]) {
         this.assistantAppChats[chatId] = {
           id: chatId,
+          mode: payload.mode || 'normal',
           messages: []
         }
       }
 
-      this.assistantAppChats[chatId].messages.push({
+      const message = {
         id: uuidv4(),
-        content: message,
-        isUser,
+        content: payload.content || '',
+        isUser: Boolean(payload.isUser),
+        role: payload.isUser ? 'user' : 'assistant',
+        mode: payload.mode || this.assistantAppChats[chatId].mode || 'normal',
+        status: payload.status || 'complete',
+        details: payload.details || null,
         timestamp: new Date()
-      })
+      }
+      this.assistantAppChats[chatId].messages.push(message)
+      return message.id
+    },
+
+    updateLastAssistantMessage(chatId, patch) {
+      const chat = this.assistantAppChats[chatId]
+      if (!chat) return
+      const message = [...chat.messages].reverse().find((item) => !item.isUser)
+      if (message) Object.assign(message, patch)
+    },
+
+    createAssistantAppChat() {
+      return this.createConversation('normal')
+    },
+
+    addAssistantAppMessage(chatId, message, isUser = true) {
+      return this.addMessage(chatId, { content: message, isUser })
     },
 
     addManusAppMessage(message, isUser = true) {

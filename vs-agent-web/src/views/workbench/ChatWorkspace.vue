@@ -1,27 +1,27 @@
 <template>
   <section class="chat-workspace">
-    <header class="chat-workspace-header">
+    <header class="workspace-header">
       <div>
-        <h2>Workbench chat</h2>
-        <p class="muted">Start a conversation, search knowledge, or run an agent task.</p>
+        <h1>Chat</h1>
+        <p class="muted">Normal, RAG, and Agent modes share this conversation context.</p>
       </div>
       <SegmentedControl v-model="mode" :options="modeOptions" />
     </header>
 
-    <div ref="messagesContainer" class="chat-workspace-messages">
-      <p v-if="messages.length === 0" class="muted">Send a message to begin.</p>
+    <div ref="messagesContainer" class="chat-transcript">
       <ChatMessage
         v-for="message in messages"
         :key="message.id"
         :content="message.content"
         :is-user="message.isUser"
         :timestamp="message.timestamp"
+        :status="message.status"
+        :details="message.details"
       />
       <LoadingIndicator v-if="loading" />
     </div>
 
     <ChatInput :loading="loading" @send="sendMessage" />
-    <p class="chat-mode-hint muted">{{ currentMode.hint }}</p>
   </section>
 </template>
 
@@ -32,6 +32,7 @@ import ChatMessage from '../../components/ChatMessage.vue'
 import LoadingIndicator from '../../components/LoadingIndicator.vue'
 import SegmentedControl from '../../components/workbench/SegmentedControl.vue'
 import { useChatStore } from '../../stores/chat'
+import { useMemoryStore } from '../../stores/memory'
 import { useWorkbenchStore } from '../../stores/workbench'
 import {
   connectToAssistantAppChat,
@@ -40,21 +41,22 @@ import {
 } from '../../services/api'
 
 const modeOptions = [
-  { value: 'normal', label: 'Chat', hint: 'Stream a standard assistant reply.' },
-  { value: 'rag', label: 'Knowledge', hint: 'Search the knowledge base before replying.' },
-  { value: 'agent', label: 'Agent', hint: 'Run a multi-step agent task with available tools.' }
+  { value: 'normal', label: 'Chat' },
+  { value: 'rag', label: 'Knowledge' },
+  { value: 'agent', label: 'Agent' }
 ]
 
 const chatStore = useChatStore()
+const memoryStore = useMemoryStore()
 const workbench = useWorkbenchStore()
 const mode = ref('normal')
 const chatId = ref('')
 const loading = ref(false)
 const eventSource = ref(null)
 const messagesContainer = ref(null)
+const lastUserMessage = ref('')
 let agentHistory = []
 
-const currentMode = computed(() => modeOptions.find((option) => option.value === mode.value))
 const messages = computed(() => chatStore.assistantAppChats[chatId.value]?.messages || [])
 
 onMounted(() => {
@@ -64,9 +66,13 @@ onMounted(() => {
     return
   }
 
-  chatId.value = chatStore.createAssistantAppChat()
+  chatId.value = chatStore.createConversation('normal')
   workbench.setConversation(chatId.value)
-  chatStore.addAssistantAppMessage(chatId.value, 'Hello. What would you like to work on?', false)
+  chatStore.addMessage(chatId.value, {
+    content: 'Hello. What would you like to work on?',
+    isUser: false,
+    status: 'complete'
+  })
 })
 
 onUnmounted(() => eventSource.value?.close())
@@ -88,7 +94,8 @@ const openConnection = (message) => {
 const sendMessage = (message) => {
   if (loading.value) return
 
-  chatStore.addAssistantAppMessage(chatId.value, message, true)
+  lastUserMessage.value = message
+  chatStore.addMessage(chatId.value, { content: message, isUser: true, mode: mode.value })
   loading.value = true
   scrollToBottom()
 
@@ -96,67 +103,96 @@ const sendMessage = (message) => {
     eventSource.value?.close()
     const source = openConnection(message)
     eventSource.value = source
-    let response = ''
+    let aiResponse = ''
     let assistantMessageAdded = false
+    let finalized = false
 
-    const finish = () => {
+    const finalize = (status = aiResponse ? 'complete' : 'incomplete') => {
+      if (finalized) return
+      finalized = true
       source.close()
       if (eventSource.value === source) eventSource.value = null
-      if (mode.value === 'agent' && response) agentHistory.push({ assistant: response })
+      chatStore.updateLastAssistantMessage(chatId.value, { status })
+      if (mode.value === 'agent' && aiResponse) agentHistory.push({ assistant: aiResponse })
+      memoryStore.suggestMemory({ userMessage: lastUserMessage.value, assistantMessage: aiResponse })
+      workbench.addInvocation({
+        source: 'chat',
+        operation: 'assistant-response',
+        mode: mode.value,
+        status,
+        summary: aiResponse ? aiResponse.slice(0, 160) : 'No assistant response received.'
+      })
       loading.value = false
+      scrollToBottom()
     }
 
     source.onmessage = (event) => {
       if (!event.data) return
-      response += event.data
+      aiResponse += event.data
       if (!assistantMessageAdded) {
-        chatStore.addAssistantAppMessage(chatId.value, response, false)
+        chatStore.addMessage(chatId.value, {
+          content: aiResponse,
+          isUser: false,
+          mode: mode.value,
+          status: 'streaming'
+        })
         assistantMessageAdded = true
       } else {
-        const lastMessage = messages.value.at(-1)
-        if (lastMessage && !lastMessage.isUser) lastMessage.content = response
+        chatStore.updateLastAssistantMessage(chatId.value, { content: aiResponse, status: 'streaming' })
       }
       scrollToBottom()
     }
 
-    source.addEventListener('complete', finish)
+    source.addEventListener('complete', () => finalize())
     source.onerror = () => {
       if (!assistantMessageAdded) {
-        chatStore.addAssistantAppMessage(chatId.value, 'Unable to connect to the assistant. Please try again.', false)
+        chatStore.addMessage(chatId.value, {
+          content: 'Unable to connect to the assistant. Please check that the backend is running, then try again.',
+          isUser: false,
+          mode: mode.value,
+          status: 'error',
+          details: 'The assistant stream could not be opened or was interrupted.'
+        })
       }
-      finish()
+      finalize(assistantMessageAdded ? 'incomplete' : 'error')
     }
   } catch {
     loading.value = false
-    chatStore.addAssistantAppMessage(chatId.value, 'Unable to start the assistant. Please try again.', false)
+    chatStore.addMessage(chatId.value, {
+      content: 'Unable to start the assistant. Please check that the backend is running, then try again.',
+      isUser: false,
+      mode: mode.value,
+      status: 'error',
+      details: 'The browser could not create an assistant stream.'
+    })
+    workbench.addInvocation({
+      source: 'chat',
+      operation: 'assistant-response',
+      mode: mode.value,
+      status: 'error',
+      summary: 'Assistant stream could not be started.'
+    })
+    scrollToBottom()
   }
 }
 </script>
 
 <style scoped>
 .chat-workspace {
-  --color-surface: var(--color-panel);
-  --color-surface-alt: var(--color-panel-muted);
-  --color-primary-soft: rgba(90, 167, 255, 0.45);
-  --gradient-brand: var(--color-primary);
   display: grid;
-  grid-template-rows: auto minmax(260px, 1fr) auto auto;
+  grid-template-rows: auto minmax(260px, 1fr) auto;
   min-height: calc(100vh - 80px);
   overflow: hidden;
   background: var(--color-panel);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-panel);
 }
 
-.chat-workspace-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 20px; border-bottom: 1px solid var(--color-border); }
-.chat-workspace-header h2 { margin: 0 0 4px; font-size: 1.1rem; }
-.chat-workspace-header p { margin: 0; }
-.chat-workspace-messages { min-height: 0; overflow-y: auto; padding: 20px; }
-.chat-mode-hint { margin: 0; padding: 8px 20px; border-top: 1px solid var(--color-border); font-size: 0.8rem; }
+.workspace-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 20px; border-bottom: 1px solid var(--color-border); }
+.workspace-header h1 { margin: 0 0 4px; font-size: 1.15rem; }
+.workspace-header p { margin: 0; }
+.chat-transcript { min-height: 0; overflow-y: auto; padding: 20px; }
 
 @media (max-width: 900px) {
   .chat-workspace { min-height: calc(100vh - 150px); }
-  .chat-workspace-header { align-items: flex-start; flex-direction: column; }
+  .workspace-header { align-items: flex-start; flex-direction: column; }
 }
 </style>

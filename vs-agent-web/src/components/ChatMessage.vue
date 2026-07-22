@@ -1,12 +1,16 @@
 <template>
   <div :class="['message', isUser ? 'user-message' : 'ai-message']">
-    <div class="avatar">
-      <span v-if="isUser">👤</span>
-      <span v-else>🤖</span>
-    </div>
+    <div class="avatar"><span>{{ isUser ? 'You' : 'AI' }}</span></div>
     <div class="message-content">
       <div class="message-text" v-html="formattedMessage"></div>
-      <div class="message-time">{{ formattedTime }}</div>
+      <div class="message-meta">
+        <span v-if="statusText" class="message-status" :class="`status-${status}`">{{ statusText }}</span>
+        <span v-if="formattedTime" class="message-time">{{ formattedTime }}</span>
+      </div>
+      <details v-if="detailsText" class="message-details">
+        <summary>Details</summary>
+        <pre>{{ detailsText }}</pre>
+      </details>
     </div>
   </div>
 </template>
@@ -16,25 +20,29 @@ import { computed } from 'vue'
 import { marked } from 'marked'
 
 const props = defineProps({
-  content: {
-    type: String,
-    required: true
-  },
-  isUser: {
-    type: Boolean,
-    default: false
-  },
-  timestamp: {
-    type: Date,
-    default: () => new Date()
-  }
+  content: { type: String, required: true },
+  isUser: { type: Boolean, default: false },
+  timestamp: { type: [String, Date], default: '' },
+  status: { type: String, default: 'complete' },
+  details: { type: [Object, Array, String], default: null }
 })
 
 const formattedTime = computed(() => {
-  return props.timestamp.toLocaleTimeString('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  if (!props.timestamp) return ''
+  const value = props.timestamp instanceof Date ? props.timestamp : new Date(props.timestamp)
+  if (Number.isNaN(value.getTime())) return ''
+  return value.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+})
+
+const statusText = computed(() => ({
+  streaming: 'Streaming',
+  incomplete: 'Response interrupted',
+  error: 'Connection error'
+}[props.status] || ''))
+
+const detailsText = computed(() => {
+  if (!props.details) return ''
+  return typeof props.details === 'string' ? props.details : JSON.stringify(props.details, null, 2)
 })
 
 const escapeHtml = (value) => value
@@ -98,108 +106,49 @@ const formattedMessage = computed(() => {
 </script>
 
 <style scoped>
-.message {
-  display: flex;
-  margin-bottom: 16px;
-  max-width: 80%;
-}
-
-.user-message {
-  margin-left: auto;
-  flex-direction: row-reverse;
-}
-
-.ai-message {
-  margin-right: auto;
-}
+.message { display: flex; margin-bottom: 12px; max-width: min(80%, 760px); }
+.user-message { margin-left: auto; flex-direction: row-reverse; }
+.ai-message { margin-right: auto; }
 
 .avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  margin: 0 8px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 8px;
-  font-size: 20px;
+  background: var(--color-panel-muted);
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
 }
 
 .message-content {
-  padding: 10px 14px;
-  border-radius: 18px;
-  background: var(--color-surface);
+  padding: 9px 12px;
   border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-panel-muted);
   color: var(--color-text);
 }
-
 .user-message .message-content {
-  background: linear-gradient(160deg, rgba(34, 211, 238, 0.18), rgba(99, 102, 241, 0.14));
-  border-color: var(--color-primary-soft);
-  border-top-right-radius: 0;
+  background: color-mix(in srgb, var(--color-primary) 16%, var(--color-panel-muted));
+  border-color: color-mix(in srgb, var(--color-primary) 42%, var(--color-border));
 }
 
-.ai-message .message-content {
-  background: var(--color-surface);
-  border-top-left-radius: 0;
-}
+.message-text { word-break: break-word; text-align: left; }
+.message-text :deep(p) { margin: 0; text-align: left; }
+.message-meta { display: flex; align-items: center; gap: 8px; margin-top: 5px; font-size: 0.72rem; opacity: 0.7; }
+.message-time { margin-left: auto; }
+.message-status { font-weight: 600; }
+.status-streaming { color: var(--color-primary); }
+.status-incomplete, .status-error { color: #d0804c; }
+.message-details { margin-top: 7px; font-size: 0.75rem; }
+.message-details summary { cursor: pointer; color: var(--color-text-muted); }
+.message-details pre { margin: 5px 0 0; overflow-x: auto; white-space: pre-wrap; font: inherit; color: var(--color-text-muted); }
 
-.message-text {
-  /*white-space: pre-wrap;*/
-  word-break: break-word;
-  text-align: left;
-}
-
-.message-text :deep(p) {
-  margin: 0;
-  text-align: left;
-}
-
-.message-time {
-  font-size: 12px;
-  opacity: 0.7;
-  text-align: right;
-  margin-top: 4px;
-}
-
-/* 移动端适配 */
 @media (max-width: 768px) {
-  .message {
-    max-width: 85%;
-  }
-  
-  .message-content {
-    padding: 8px 12px;
-  }
-  
-  .avatar {
-    width: 32px;
-    height: 32px;
-    font-size: 18px;
-  }
-}
-
-/* 小屏幕移动设备适配 */
-@media (max-width: 480px) {
-  .message {
-    max-width: 90%;
-    margin-bottom: 12px;
-  }
-  
-  .avatar {
-    width: 28px;
-    height: 28px;
-    margin: 0 5px;
-    font-size: 16px;
-  }
-  
-  .message-content {
-    padding: 6px 10px;
-    font-size: 14px;
-  }
-  
-  .message-time {
-    font-size: 10px;
-    margin-top: 2px;
-  }
+  .message { max-width: 88%; }
+  .avatar { width: 28px; height: 28px; margin: 0 6px; }
 }
 </style>

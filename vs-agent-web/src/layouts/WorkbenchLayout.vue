@@ -1,7 +1,7 @@
 <template>
   <div class="workbench-layout">
     <AppRail :areas="areas" :active-area="workbench.activeArea" :runtime-status="runtimeStatus" :runtime-label="runtimeLabel" />
-    <main class="workbench-main">
+    <main class="workbench-main" aria-label="Agent workbench">
       <CommandBar v-model="commandQuery" @run="runCommand" />
       <RouterView />
     </main>
