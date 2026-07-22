@@ -7,6 +7,7 @@ import { localizedDescription, productErrorMessage } from '../src/utils/productT
 import { buildWorkbenchSnapshot, restoreWorkbenchSnapshot } from '../src/utils/workbenchPersistence.js'
 import { applyWorkbenchSnapshotToStores, shouldPersistWorkbenchChats } from '../src/utils/workbenchSession.js'
 import { useChatStore } from '../src/stores/chat.js'
+import { resolveChatSession } from '../src/utils/chatSession.js'
 
 test('an SSE closure after response content completes the message', () => {
   assert.equal(streamClosureStatus('A streamed response'), 'complete')
@@ -159,6 +160,54 @@ test('clearing a conversation retains metadata while deleting removes it', () =>
 
   assert.equal(chatStore.deleteConversation(chatId), true)
   assert.equal(chatStore.assistantAppChats[chatId], undefined)
+})
+
+test('chat session selects the restored conversation before creating another', () => {
+  const chatStore = {
+    created: 0,
+    assistantAppChats: {
+      restored: { id: 'restored', updatedAt: '2026-07-23T10:00:00.000Z', messages: [] }
+    },
+    createConversation() {
+      this.created += 1
+      return 'new-chat'
+    },
+    addMessage() {
+      throw new Error('restored conversations must not receive a new welcome message')
+    }
+  }
+  const workbench = {
+    currentConversationId: 'restored',
+    setConversation(id) {
+      this.currentConversationId = id
+    }
+  }
+
+  const result = resolveChatSession({ chatStore, workbench, welcomeMessage: '欢迎' })
+  assert.deepEqual(result, { chatId: 'restored', created: false })
+  assert.equal(chatStore.created, 0)
+})
+
+test('chat session creates one welcome conversation when no records remain', () => {
+  const chatStore = {
+    created: 0,
+    messages: [],
+    assistantAppChats: {},
+    createConversation(mode) {
+      this.created += 1
+      assert.equal(mode, 'normal')
+      return 'new-chat'
+    },
+    addMessage(chatId, message) {
+      this.messages.push({ chatId, ...message })
+    }
+  }
+  const workbench = { currentConversationId: '', setConversation(id) { this.currentConversationId = id } }
+
+  const result = resolveChatSession({ chatStore, workbench, welcomeMessage: '欢迎' })
+  assert.deepEqual(result, { chatId: 'new-chat', created: true })
+  assert.equal(chatStore.created, 1)
+  assert.deepEqual(chatStore.messages, [{ chatId: 'new-chat', content: '欢迎', isUser: false, status: 'complete' }])
 })
 
 test('workbench session restore is layout-level and independent of the chat page', () => {

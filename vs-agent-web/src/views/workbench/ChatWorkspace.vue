@@ -35,6 +35,7 @@ import { useChatStore } from '../../stores/chat'
 import { useMemoryStore } from '../../stores/memory'
 import { useWorkbenchStore } from '../../stores/workbench'
 import { streamClosureStatus } from '../../utils/streamLifecycle'
+import { resolveChatSession } from '../../utils/chatSession'
 import {
   connectToAssistantAppChat,
   connectToAssistantAppRagChat,
@@ -63,21 +64,12 @@ const messages = computed(() => chatStore.assistantAppChats[chatId.value]?.messa
 watch(mode, (value) => workbench.setMode(value), { immediate: true })
 
 onMounted(() => {
-  const existingChatId = workbench.currentConversationId
-  if (existingChatId && chatStore.assistantAppChats[existingChatId]) {
-    chatId.value = existingChatId
-    workbench.setConversation(chatId.value)
-    if (mode.value === 'agent') rebuildAgentHistory()
-    return
-  }
-
-  chatId.value = chatStore.createConversation('normal')
-  workbench.setConversation(chatId.value)
-  chatStore.addMessage(chatId.value, {
-    content: '你好，我可以帮你对话、查知识库，或切换到智能体模式执行任务。',
-    isUser: false,
-    status: 'complete'
-  })
+  chatId.value = resolveChatSession({
+    chatStore,
+    workbench,
+    welcomeMessage: '你好，我可以帮你对话、查知识库，或切换到智能体模式执行任务。'
+  }).chatId
+  if (mode.value === 'agent') rebuildAgentHistory()
 })
 
 onUnmounted(() => eventSource.value?.close())
