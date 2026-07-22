@@ -120,7 +120,7 @@ const sendMessage = (message) => {
       if (requestMode === 'agent' && aiResponse) agentHistory.push({ assistant: aiResponse })
       memoryStore.suggestMemory({ userMessage: lastUserMessage.value, assistantMessage: aiResponse })
       workbench.addInvocation({
-        source: mode.value,
+        source: requestMode,
         name: 'chat',
         status: aiResponse ? 'complete' : 'incomplete',
         summary: lastUserMessage.value.slice(0, 120)
@@ -169,7 +169,7 @@ const sendMessage = (message) => {
       details: 'The browser could not create an assistant stream.'
     })
     workbench.addInvocation({
-      source: 'chat',
+      source: requestMode,
       operation: 'assistant-response',
       mode: requestMode,
       status: 'error',
