@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { buildCapabilityCatalog, capabilityStats } from '../src/utils/capabilityCatalog.js'
 import { parseJsonObject, streamClosureStatus } from '../src/utils/streamLifecycle.js'
 import { localizedDescription, productErrorMessage } from '../src/utils/productText.js'
+import { buildWorkbenchSnapshot, restoreWorkbenchSnapshot } from '../src/utils/workbenchPersistence.js'
 
 test('an SSE closure after response content completes the message', () => {
   assert.equal(streamClosureStatus('A streamed response'), 'complete')
@@ -51,4 +52,70 @@ test('capability catalog combines platform tools and skills before optional MCP 
     mcp: 1,
     managed: 0
   })
+})
+
+test('capability catalog assigns functional domains and permission levels', () => {
+  const catalog = buildCapabilityCatalog({
+    platformTools: [
+      { toolName: 'web_search', sourceType: 'LOCAL', tags: ['search', 'retrieval'] },
+      { toolName: 'mcp_router', sourceType: 'MCP', tags: ['mcp', 'tool-calling'] }
+    ],
+    skills: [
+      { name: 'pdf-generation', tags: ['file', 'document'] },
+      { name: 'astro-shoot-plan', tags: ['astro', 'photography', 'composite'] }
+    ]
+  })
+
+  assert.deepEqual(
+    catalog.map((item) => [item.name, item.functionGroup, item.permission.level]),
+    [
+      ['web_search', '检索与资料', 'external_read'],
+      ['mcp_router', '外部 MCP', 'confirm'],
+      ['pdf-generation', '文档与文件', 'local_write'],
+      ['astro-shoot-plan', '天文摄影', 'direct']
+    ]
+  )
+  assert.deepEqual(catalog.find((item) => item.name === 'astro-shoot-plan').dependentTools, [
+    'milkyway_rise',
+    'light_pollution',
+    'cloud_cover'
+  ])
+})
+
+test('workbench persistence restores the active session without storing unbounded transcript data', () => {
+  const snapshot = buildWorkbenchSnapshot({
+    workbench: {
+      currentConversationId: 'conv-1',
+      currentMode: 'rag',
+      activeArea: 'chat',
+      inspectorOpen: false
+    },
+    chats: {
+      'conv-1': {
+        id: 'conv-1',
+        mode: 'rag',
+        createdAt: '2026-07-22T00:00:00.000Z',
+        messages: Array.from({ length: 45 }, (_, index) => ({
+          id: `m-${index}`,
+          content: index === 44 ? '长内容'.repeat(3000) : `消息 ${index}`,
+          isUser: index % 2 === 0,
+          role: index % 2 === 0 ? 'user' : 'assistant',
+          mode: 'rag',
+          status: 'complete',
+          timestamp: '2026-07-22T00:00:00.000Z'
+        }))
+      }
+    }
+  })
+
+  assert.equal(snapshot.currentConversationId, 'conv-1')
+  assert.equal(snapshot.currentMode, 'rag')
+  assert.equal(snapshot.ui.inspectorOpen, false)
+  assert.equal(snapshot.conversations[0].messages.length, 40)
+  assert.equal(snapshot.conversations[0].messages.at(-1).content.length, 4001)
+  assert.equal(snapshot.conversations[0].messages.at(-1).content.endsWith('…'), true)
+
+  const restored = restoreWorkbenchSnapshot(JSON.stringify(snapshot))
+  assert.equal(restored.currentConversationId, 'conv-1')
+  assert.equal(restored.conversations[0].messages.length, 40)
 })

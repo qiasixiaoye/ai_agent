@@ -14,19 +14,40 @@ export const useChatStore = defineStore('chat', {
         id: chatId,
         mode,
         messages: [],
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       }
       return chatId
+    },
+
+    hydrateAssistantAppChats(conversations = []) {
+      conversations.forEach((conversation) => {
+        if (!conversation?.id) return
+        this.assistantAppChats[conversation.id] = {
+          id: conversation.id,
+          title: conversation.title || '未命名会话',
+          mode: conversation.mode || 'normal',
+          createdAt: conversation.createdAt || new Date().toISOString(),
+          updatedAt: conversation.updatedAt || new Date().toISOString(),
+          messages: Array.isArray(conversation.messages)
+            ? conversation.messages.map((message) => ({
+                ...message,
+                timestamp: message.timestamp ? new Date(message.timestamp) : new Date()
+              }))
+            : []
+        }
+      })
     },
 
     addMessage(chatId, payload) {
       if (!this.assistantAppChats[chatId]) {
         this.assistantAppChats[chatId] = {
-          id: chatId,
-          mode: payload.mode || 'normal',
-          messages: []
-        }
+        id: chatId,
+        mode: payload.mode || 'normal',
+        messages: [],
+        createdAt: new Date().toISOString()
       }
+    }
 
       const message = {
         id: uuidv4(),
@@ -39,6 +60,8 @@ export const useChatStore = defineStore('chat', {
         timestamp: new Date()
       }
       this.assistantAppChats[chatId].messages.push(message)
+      this.assistantAppChats[chatId].updatedAt = new Date().toISOString()
+      if (message.isUser) this.assistantAppChats[chatId].title = message.content.slice(0, 80) || this.assistantAppChats[chatId].title
       return message.id
     },
 
@@ -46,7 +69,10 @@ export const useChatStore = defineStore('chat', {
       const chat = this.assistantAppChats[chatId]
       if (!chat) return
       const message = [...chat.messages].reverse().find((item) => !item.isUser)
-      if (message) Object.assign(message, patch)
+      if (message) {
+        Object.assign(message, patch)
+        chat.updatedAt = new Date().toISOString()
+      }
     },
 
     createAssistantAppChat() {

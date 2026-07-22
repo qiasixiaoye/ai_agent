@@ -82,6 +82,8 @@
               <strong>{{ item.label }}</strong>
               <span class="card-description">{{ describe(item.description, '该能力暂未提供中文说明。') }}</span>
               <span class="card-meta">
+                <span>{{ item.functionGroup }}</span>
+                <span>{{ item.permission?.label }}</span>
                 <span>{{ sourceLabel(item) }}</span>
                 <span v-if="item.timeoutMs">{{ Math.round(item.timeoutMs / 1000) }} 秒超时</span>
                 <span v-if="item.requiredParams?.length">需 {{ item.requiredParams.length }} 个参数</span>
@@ -124,6 +126,14 @@
               <dd>{{ selectedCapability.governance }}</dd>
             </div>
             <div>
+              <dt>功能域</dt>
+              <dd>{{ selectedCapability.functionGroup }}</dd>
+            </div>
+            <div>
+              <dt>权限等级</dt>
+              <dd>{{ selectedCapability.permission?.label }} · {{ selectedCapability.permission?.scope }}</dd>
+            </div>
+            <div>
               <dt>必填参数</dt>
               <dd>
                 <template v-if="selectedCapability.requiredParams?.length">
@@ -132,12 +142,21 @@
                 <span v-else>未声明</span>
               </dd>
             </div>
+            <div>
+              <dt>依赖能力</dt>
+              <dd>
+                <template v-if="selectedCapability.dependentTools?.length">
+                  <code v-for="tool in selectedCapability.dependentTools" :key="tool">{{ tool }}</code>
+                </template>
+                <span v-else>无显式依赖</span>
+              </dd>
+            </div>
           </dl>
 
           <PermissionNotice
-            v-if="selectedCapability.kind === 'managed'"
-            :risk="managedRisk"
-            :reason="selectedCapability.raw?.reason || selectedCapability.description || ''"
+            v-if="capabilityRisk !== 'safe'"
+            :risk="capabilityRisk"
+            :reason="selectedCapability.permission?.reason || selectedCapability.raw?.reason || selectedCapability.description || ''"
             :confirmed="managedConfirmed"
             @confirm="executeCapability(true)"
           />
@@ -148,14 +167,14 @@
 
           <div class="action-row">
             <button
-              v-if="managedRisk !== 'blocked'"
+              v-if="capabilityRisk !== 'blocked'"
               type="button"
               :disabled="invoking"
-              @click="executeCapability(selectedCapability.kind === 'managed' && managedRisk !== 'safe')"
+              @click="executeCapability(capabilityRisk !== 'safe')"
             >
               {{ invoking ? '调用中…' : actionLabel }}
             </button>
-            <p v-else class="status-error">该受管工具已被运行策略阻止。</p>
+            <p v-else class="status-error">该能力已被运行策略阻止。</p>
           </div>
 
           <pre v-if="lastResult">{{ pretty(lastResult) }}</pre>
@@ -218,11 +237,17 @@ const selectedCapability = computed(() => {
   if (item?.kind === 'skill' && skills.selected?.name === item.name) return { ...item, ...normalizeSkill(skills.selected) }
   return item
 })
-const managedRisk = computed(() => selectedCapability.value?.kind === 'managed' ? runtime.riskForTool(selectedCapability.value.raw) : 'safe')
+const capabilityRisk = computed(() => {
+  const level = selectedCapability.value?.permission?.level
+  if (level === 'blocked') return 'blocked'
+  if (level === 'confirm' || level === 'local_write') return 'confirm'
+  if (selectedCapability.value?.kind === 'managed') return runtime.riskForTool(selectedCapability.value.raw)
+  return 'safe'
+})
 const actionLabel = computed(() => {
   if (!selectedCapability.value) return '调用能力'
   if (selectedCapability.value.kind === 'skill') return '执行技能'
-  if (selectedCapability.value.kind === 'managed' && managedRisk.value !== 'safe') return '确认并调用'
+  if (capabilityRisk.value !== 'safe') return '确认并调用'
   return '调用工具'
 })
 const filteredCatalog = computed(() => {
@@ -236,6 +261,9 @@ const filteredCatalog = computed(() => {
       item.name,
       item.description,
       item.category,
+      item.functionGroup,
+      item.permission?.label,
+      item.permission?.scope,
       item.sourceType,
       ...(item.tags || [])
     ].join(' ').toLowerCase()

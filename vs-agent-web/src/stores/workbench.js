@@ -22,6 +22,13 @@ export const useWorkbenchStore = defineStore('workbench', {
     setConversation(id) {
       this.currentConversationId = id
     },
+    restorePersistedState(snapshot) {
+      if (!snapshot) return
+      this.currentConversationId = snapshot.currentConversationId || this.currentConversationId
+      this.currentMode = snapshot.currentMode || this.currentMode
+      this.activeArea = snapshot.activeArea || this.activeArea
+      this.inspectorOpen = snapshot.ui?.inspectorOpen !== false
+    },
     setMode(mode) {
       this.currentMode = mode || 'normal'
     },

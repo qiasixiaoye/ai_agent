@@ -4,6 +4,17 @@
       <dl class="inspector-details">
         <div><dt>会话</dt><dd>{{ conversationId || '尚未创建' }}</dd></div>
         <div><dt>模式</dt><dd>{{ modeLabel }}</dd></div>
+        <div><dt>恢复</dt><dd>本地会话索引已启用</dd></div>
+      </dl>
+    </WorkbenchSection>
+
+    <WorkbenchSection title="长期记忆">
+      <p class="muted">{{ memoryBindingText }}</p>
+      <dl v-if="memory.conversation" class="inspector-details">
+        <div><dt>工作</dt><dd>{{ memory.conversation.workingMessageCount || 0 }} 条消息</dd></div>
+        <div><dt>摘要</dt><dd>{{ memory.conversation.rollingSummary ? '已生成' : '暂无' }}</dd></div>
+        <div><dt>语义</dt><dd>{{ (memory.conversation.semanticMemories || []).length }} 条</dd></div>
+        <div><dt>情景</dt><dd>{{ (memory.conversation.episodicMemories || []).length }} 条</dd></div>
       </dl>
     </WorkbenchSection>
 
@@ -74,6 +85,18 @@ const modeLabel = computed(() => ({
   rag: '知识库',
   agent: '智能体'
 }[workbench.currentMode] || '普通对话'))
+const memoryBindingText = computed(() => {
+  if (!conversationId.value) return '尚未创建会话，无法绑定长期记忆。'
+  if (memory.loading) return '正在检查后端长期记忆。'
+  if (memory.error) return memory.error
+  if (!memory.conversation) return '尚未加载长期记忆快照。'
+  const semantic = (memory.conversation.semanticMemories || []).length
+  const episodic = (memory.conversation.episodicMemories || []).length
+  const working = memory.conversation.workingMessageCount || 0
+  const hasSummary = Boolean(memory.conversation.rollingSummary)
+  if (!working && !semantic && !episodic && !hasSummary) return '已连接后端记忆服务，当前会话暂无长期记忆。'
+  return '已绑定后端长期记忆，模型调用前会按预算召回相关摘要、语义和情景记忆。'
+})
 
 watch(
   () => memory.suggestion,
