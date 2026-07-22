@@ -35,7 +35,10 @@ const routerPath = resolve(root, 'src/router/index.js')
 if (existsSync(routerPath)) {
   const router = readFileSync(routerPath, 'utf8')
   for (const path of ['/', '/tools', '/skills', '/runtime', '/memory', '/workflow-studio', '/knowledge-base', '/observability']) {
-    if (!router.includes(`path: '${path}'`) && !router.includes(`path: \"${path}\"`)) {
+    const childPath = path === '/' ? null : path.slice(1)
+    const hasAbsolutePath = router.includes(`path: '${path}'`) || router.includes(`path: \"${path}\"`)
+    const hasChildPath = childPath && (router.includes(`path: '${childPath}'`) || router.includes(`path: \"${childPath}\"`))
+    if (!hasAbsolutePath && !hasChildPath) {
       failures.push(`router missing ${path}`)
     }
   }
