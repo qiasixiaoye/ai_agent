@@ -1,7 +1,8 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const root = resolve(new URL('..', import.meta.url).pathname)
+const root = fileURLToPath(new URL('..', import.meta.url))
 const requiredFiles = [
   'src/layouts/WorkbenchLayout.vue',
   'src/components/workbench/AppRail.vue',
