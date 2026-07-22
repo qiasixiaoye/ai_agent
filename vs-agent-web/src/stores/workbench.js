@@ -17,6 +17,7 @@ export const WORKBENCH_AREAS = [
 export const useWorkbenchStore = defineStore('workbench', {
   state: () => ({
     currentConversationId: '',
+    currentMode: 'normal',
     activeArea: 'chat',
     inspectorOpen: true,
     recentInvocations: [],
@@ -25,6 +26,9 @@ export const useWorkbenchStore = defineStore('workbench', {
   actions: {
     setConversation(id) {
       this.currentConversationId = id
+    },
+    setMode(mode) {
+      this.currentMode = mode || 'normal'
     },
     setActiveArea(area) {
       this.activeArea = area

@@ -26,7 +26,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import ChatInput from '../../components/ChatInput.vue'
 import ChatMessage from '../../components/ChatMessage.vue'
 import LoadingIndicator from '../../components/LoadingIndicator.vue'
@@ -49,7 +49,7 @@ const modeOptions = [
 const chatStore = useChatStore()
 const memoryStore = useMemoryStore()
 const workbench = useWorkbenchStore()
-const mode = ref('normal')
+const mode = ref(workbench.currentMode || 'normal')
 const chatId = ref('')
 const loading = ref(false)
 const eventSource = ref(null)
@@ -58,6 +58,8 @@ const lastUserMessage = ref('')
 let agentHistory = []
 
 const messages = computed(() => chatStore.assistantAppChats[chatId.value]?.messages || [])
+
+watch(mode, (value) => workbench.setMode(value), { immediate: true })
 
 onMounted(() => {
   const existingChatId = workbench.currentConversationId

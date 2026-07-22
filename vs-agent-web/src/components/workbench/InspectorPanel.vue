@@ -93,7 +93,7 @@ const conversationId = computed(() => workbench.currentConversationId)
 const chatMessages = computed(() => chatStore.assistantAppChats[conversationId.value]?.messages || [])
 const lastUserMessage = computed(() => [...chatMessages.value].reverse().find((message) => message.isUser)?.content || '')
 const previewQuery = computed(() => lastUserMessage.value.trim())
-const activeMode = computed(() => chatMessages.value.at(-1)?.mode || 'normal')
+const activeMode = computed(() => workbench.currentMode)
 const diagnosticBuckets = computed(() => {
   const diagnostics = memory.diagnostics || {}
   return [
