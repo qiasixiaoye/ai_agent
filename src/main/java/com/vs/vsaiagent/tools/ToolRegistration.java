@@ -1,5 +1,7 @@
 package com.vs.vsaiagent.tools;
 
+import com.vs.vsaiagent.context.BudgetedToolCallback;
+import com.vs.vsaiagent.context.ToolResultCompressor;
 import com.vs.vsaiagent.observability.service.ExecutionLogService;
 import com.vs.vsaiagent.observability.tool.LoggingToolCallback;
 import com.vs.vsaiagent.tools.astro.CloudCoverTool;
@@ -24,9 +26,12 @@ public class ToolRegistration {
     private String imageApiKey;
 
     private final ExecutionLogService executionLogService;
+    private final ToolResultCompressor toolResultCompressor;
 
-    public ToolRegistration(ExecutionLogService executionLogService) {
+    public ToolRegistration(ExecutionLogService executionLogService,
+                            ToolResultCompressor toolResultCompressor) {
         this.executionLogService = executionLogService;
+        this.toolResultCompressor = toolResultCompressor;
     }
 
     @Bean
@@ -57,7 +62,8 @@ public class ToolRegistration {
         );
         ToolCallback[] wrapped = new ToolCallback[callbacks.length];
         for (int i = 0; i < callbacks.length; i++) {
-            wrapped[i] = new LoggingToolCallback(callbacks[i], executionLogService);
+            ToolCallback logged = new LoggingToolCallback(callbacks[i], executionLogService);
+            wrapped[i] = new BudgetedToolCallback(logged, toolResultCompressor, executionLogService);
         }
         return wrapped;
     }

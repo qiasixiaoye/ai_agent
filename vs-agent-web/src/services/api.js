@@ -51,6 +51,27 @@ export const listSkills = async () => unwrap(await api.get('/skills'))
 export const getSkill = async (name) => unwrap(await api.get(`/skills/${encodeURIComponent(name)}`))
 export const executeSkill = async (name, args) => unwrap(await api.post(`/skills/${encodeURIComponent(name)}/execute`, args || {}))
 export const skillOpenApiUrl = () => `${baseURL}/skills/openapi.json`
+export const previewSkillRoute = async (query, topK = 3, threshold = 0.24) =>
+  unwrap(await api.get('/skills/route', { params: { query, topK, threshold } }))
+export const evaluateSkillRouting = async () => unwrap(await api.get('/skills/route/evaluate'))
+
+// ---------------- Runtime: MCP governance + hierarchical memory ----------------
+
+export const getMcpRuntimeHealth = async () => unwrap(await api.get('/mcp-management/health'))
+export const listManagedMcpTools = async () => unwrap(await api.get('/mcp-management/tools'))
+export const refreshManagedMcpTools = async () => unwrap(await api.post('/mcp-management/tools/refresh'))
+export const invokeManagedMcpTool = async ({ toolName, argumentsJson, confirmed }) =>
+  unwrap(await api.post('/mcp-management/tools/invoke', { toolName, argumentsJson, confirmed }))
+export const getConversationMemory = async (conversationId) =>
+  unwrap(await api.get(`/memory/conversations/${encodeURIComponent(conversationId)}`))
+export const previewConversationContext = async (conversationId, query, tokenBudget = 2500) =>
+  unwrap(await api.get(`/memory/conversations/${encodeURIComponent(conversationId)}/context`, { params: { query, tokenBudget } }))
+export const getContextDiagnostics = async (conversationId, query, mode = 'plain') =>
+  unwrap(await api.get('/context-management/diagnostics', { params: { conversationId, query, mode } }))
+export const addSemanticMemory = async (conversationId, content, importance = 0.8) =>
+  unwrap(await api.post(`/memory/conversations/${encodeURIComponent(conversationId)}/semantic`, { content, importance }))
+export const clearConversationMemory = async (conversationId) =>
+  unwrap(await api.delete(`/memory/conversations/${encodeURIComponent(conversationId)}`))
 
 // ---------------- Knowledge Base ----------------
 
@@ -118,5 +139,25 @@ export const evalWorkflow = async (id, body) =>
   unwrap(await api.post(`/workflow/${encodeURIComponent(id)}/eval`, body, { timeout: 600000 }))
 
 export const workflowDifyDslUrl = (id) => `${baseURL}/workflow/${encodeURIComponent(id)}/dify-dsl`
+
+// ---------------- Workflow Builder (NL → IR → Dify DSL) ----------------
+
+// mode:    'http'（工具→HTTP 请求节点固定编排）| 'agent'（单 Agent 节点挂载 MCP 工具，LLM 自主调用）
+// appKind: 'chatflow'（默认，多轮对话 advanced-chat，answer 收尾+记忆）| 'workflow'（单轮，end 收尾）
+export const generateWorkflowFromRequirement = async (requirement, mode = 'http', appKind = 'chatflow') =>
+  unwrap(await api.post('/workflow-builder/generate', { requirement, mode, appKind }, { timeout: 600000 }))
+
+export const runGeneratedWorkflow = async (ir, input) =>
+  unwrap(await api.post('/workflow-builder/run', { ir, input }, { timeout: 600000 }))
+
+export const exportWorkflowDslUrl = (workflowId) =>
+  `${baseURL}/workflow-builder/export/${encodeURIComponent(workflowId)}`
+
+export const importGeneratedWorkflowToDify = async (workflowId) =>
+  unwrap(await api.post(`/workflow-builder/import/${encodeURIComponent(workflowId)}`, {}, { timeout: 600000 }))
+
+// 在 Dify 里草稿运行并观测运行时轨迹（节点状态 / Agent 轮次 / 错误），结果落 observability
+export const runImportedDifyApp = async (appId, appKind, query) =>
+  unwrap(await api.post('/workflow-builder/dify-run', { appId, appKind, query }, { timeout: 300000 }))
 
 export default api

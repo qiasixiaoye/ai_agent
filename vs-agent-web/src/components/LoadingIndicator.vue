@@ -13,7 +13,7 @@
   justify-content: flex-start;
   padding: 10px 14px;
   max-width: 60px;
-  background-color: white;
+  background-color: var(--color-primary);
   border-radius: 18px;
   border-top-left-radius: 0;
   margin-right: auto;

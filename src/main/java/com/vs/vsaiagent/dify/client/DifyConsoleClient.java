@@ -11,9 +11,16 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Dify Console API 客户端：登录拿 access_token + 导入 DSL 创建应用。
@@ -34,8 +41,21 @@ public class DifyConsoleClient {
 
     private final DifyConsoleProperties props;
     private final RestTemplate restTemplate = new RestTemplate();
+    /** 草稿运行返回 SSE 流（可能长达数十秒），单独用带超时的模板，避免拖死默认模板。 */
+    private final RestTemplate streamingRestTemplate = buildStreamingTemplate();
 
-    private volatile String cachedToken;
+    private volatile Auth cachedAuth;
+
+    private static RestTemplate buildStreamingTemplate() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(10_000);
+        factory.setReadTimeout(180_000);
+        return new RestTemplate(factory);
+    }
+
+    /** 登录后的鉴权材料：Dify 对 POST 有 CSRF 保护，需同时带 Bearer + Cookie + X-CSRF-Token。 */
+    private record Auth(String token, String csrf, String cookieHeader) {
+    }
 
     public DifyConsoleClient(DifyConsoleProperties props) {
         this.props = props;
@@ -61,7 +81,7 @@ public class DifyConsoleClient {
     }
 
     private DifyImportResult doImport(String yamlContent, boolean retried) {
-        String token = currentToken();
+        Auth auth = currentAuth();
 
         ObjectNode body = MAPPER.createObjectNode();
         body.put("mode", "yaml-content");
@@ -69,17 +89,18 @@ public class DifyConsoleClient {
 
         ResponseEntity<String> resp;
         try {
-            resp = post(url("/console/api/apps/imports"), token, body.toString());
+            resp = post(url("/console/api/apps/imports"), auth, body.toString());
         } catch (HttpClientErrorException.NotFound e) {
             // 旧版 Dify 回退
             ObjectNode legacy = MAPPER.createObjectNode();
             legacy.put("data", yamlContent);
-            resp = post(url("/console/api/apps/import"), token, legacy.toString());
-        } catch (HttpClientErrorException.Unauthorized e) {
+            resp = post(url("/console/api/apps/import"), auth, legacy.toString());
+        } catch (HttpClientErrorException.Unauthorized | HttpClientErrorException.Forbidden e) {
+            // 401（token 过期）或 403（CSRF）→ 清缓存重登一次
             if (retried) {
                 throw e;
             }
-            cachedToken = null;
+            cachedAuth = null;
             return doImport(yamlContent, true);
         }
 
@@ -121,52 +142,169 @@ public class DifyConsoleClient {
                 .build();
     }
 
-    private String currentToken() {
-        if (props.getAccessToken() != null && !props.getAccessToken().isBlank()) {
-            return props.getAccessToken();
+    /**
+     * 草稿运行一个已导入的 Dify 应用，返回原始 SSE 事件流文本（由上层解析 node_finished / agent_log /
+     * workflow_finished 等事件，用于运行时观测与错误暴露）。
+     *
+     * @param advancedChat true → advanced-chat(Chatflow) 端点（用 query 对话）；false → workflow 端点（用 inputs）
+     */
+    public String draftRunRaw(String appId, boolean advancedChat, String query, Map<String, Object> inputs) {
+        if (!props.isConfigured()) {
+            throw new IllegalStateException("Dify Console 未配置，无法运行");
         }
-        String token = cachedToken;
-        if (token != null) {
-            return token;
+        return doDraftRun(appId, advancedChat, query, inputs, false);
+    }
+
+    private String doDraftRun(String appId, boolean advancedChat, String query, Map<String, Object> inputs, boolean retried) {
+        Auth auth = currentAuth();
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("inputs", inputs == null ? Map.of() : inputs);
+        payload.put("response_mode", "streaming");
+        String path;
+        if (advancedChat) {
+            payload.put("query", query == null ? "" : query);
+            payload.put("conversation_id", "");
+            payload.put("files", List.of());
+            path = "/console/api/apps/" + appId + "/advanced-chat/workflows/draft/run";
+        } else {
+            path = "/console/api/apps/" + appId + "/workflows/draft/run";
         }
-        synchronized (this) {
-            if (cachedToken == null) {
-                cachedToken = login();
+
+        String json;
+        try {
+            json = MAPPER.writeValueAsString(payload);
+        } catch (Exception e) {
+            throw new IllegalStateException("构造运行请求失败: " + e.getMessage(), e);
+        }
+
+        try {
+            HttpHeaders headers = authHeaders(auth);
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setAccept(List.of(MediaType.parseMediaType("text/event-stream"), MediaType.ALL));
+            ResponseEntity<byte[]> resp = streamingRestTemplate.postForEntity(
+                    url(path), new HttpEntity<>(json, headers), byte[].class);
+            HttpStatusCode code = resp.getStatusCode();
+            byte[] body = resp.getBody();
+            String text = body == null ? "" : new String(body, StandardCharsets.UTF_8);
+            if (!code.is2xxSuccessful()) {
+                throw new IllegalStateException("Dify 运行返回 " + code.value() + ": " + truncate(text));
             }
-            return cachedToken;
+            return text;
+        } catch (HttpClientErrorException.Unauthorized | HttpClientErrorException.Forbidden e) {
+            if (retried) {
+                throw e;
+            }
+            cachedAuth = null;
+            return doDraftRun(appId, advancedChat, query, inputs, true);
         }
     }
 
-    private String login() {
+    private HttpHeaders authHeaders(Auth auth) {
+        HttpHeaders headers = new HttpHeaders();
+        if (auth != null) {
+            if (auth.token() != null) {
+                headers.setBearerAuth(auth.token());
+            }
+            if (auth.csrf() != null) {
+                headers.set("X-CSRF-Token", auth.csrf());
+            }
+            if (auth.cookieHeader() != null) {
+                headers.set(HttpHeaders.COOKIE, auth.cookieHeader());
+            }
+        }
+        return headers;
+    }
+
+    private Auth currentAuth() {
+        if (props.getAccessToken() != null && !props.getAccessToken().isBlank()) {
+            return new Auth(props.getAccessToken(), null, null);
+        }
+        Auth auth = cachedAuth;
+        if (auth != null) {
+            return auth;
+        }
+        synchronized (this) {
+            if (cachedAuth == null) {
+                cachedAuth = login();
+            }
+            return cachedAuth;
+        }
+    }
+
+    private Auth login() {
+        // Dify 1.x 登录要求密码 base64 编码（否则报 "Invalid encrypted data"）。
+        String encodedPassword = Base64.getEncoder()
+                .encodeToString(props.getPassword().getBytes(StandardCharsets.UTF_8));
         ObjectNode body = MAPPER.createObjectNode();
         body.put("email", props.getEmail());
-        body.put("password", props.getPassword());
+        body.put("password", encodedPassword);
         body.put("language", "zh-Hans");
         body.put("remember_me", true);
 
         ResponseEntity<String> resp = post(url("/console/api/login"), null, body.toString());
+        List<String> setCookies = resp.getHeaders().get(HttpHeaders.SET_COOKIE);
+
+        // token：优先 JSON body（{data:{access_token}} / {data:"<token>"}），否则取 cookie access_token
+        String token = null;
         try {
-            JsonNode node = MAPPER.readTree(resp.getBody() == null ? "{}" : resp.getBody());
-            // 1.x: {result: success, data: {access_token, refresh_token}}；部分旧版: {data: "<token>"}
-            JsonNode data = node.path("data");
-            String token = data.isTextual() ? data.asText() : data.path("access_token").asText(null);
-            if (token == null || token.isBlank()) {
-                throw new IllegalStateException("登录成功但未取到 access_token，原始响应: " + truncate(resp.getBody()));
-            }
-            log.info("[dify-console] login ok");
-            return token;
-        } catch (IllegalStateException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new IllegalStateException("解析 Dify 登录响应失败: " + e.getMessage(), e);
+            JsonNode data = MAPPER.readTree(resp.getBody() == null ? "{}" : resp.getBody()).path("data");
+            token = data.isTextual() ? data.asText() : data.path("access_token").asText(null);
+        } catch (Exception ignore) {
+            // 落到 cookie 兜底
         }
+        String cookieAccess = extractCookie(setCookies, "access_token");
+        String csrf = extractCookie(setCookies, "csrf_token");
+        if (token == null || token.isBlank()) {
+            token = cookieAccess;
+        }
+        if (token == null || token.isBlank()) {
+            throw new IllegalStateException("登录成功但未取到 access_token，原始响应: " + truncate(resp.getBody()));
+        }
+
+        // Dify 对 POST 有 CSRF 校验，导入时需把 access_token + csrf_token 作为 Cookie 一并带上。
+        StringBuilder cookie = new StringBuilder();
+        if (cookieAccess != null) {
+            cookie.append("access_token=").append(cookieAccess);
+        }
+        if (csrf != null) {
+            if (cookie.length() > 0) {
+                cookie.append("; ");
+            }
+            cookie.append("csrf_token=").append(csrf);
+        }
+        log.info("[dify-console] login ok (csrf={})", csrf != null);
+        return new Auth(token, csrf, cookie.length() > 0 ? cookie.toString() : null);
     }
 
-    private ResponseEntity<String> post(String url, String bearerToken, String jsonBody) {
+    /** 从 Set-Cookie 头里取出名字以 {@code name} 结尾的 cookie 值（如 access_token）。 */
+    private String extractCookie(List<String> setCookies, String name) {
+        if (setCookies == null) {
+            return null;
+        }
+        for (String cookie : setCookies) {
+            String first = cookie.split(";", 2)[0].trim();
+            int eq = first.indexOf('=');
+            if (eq > 0 && first.substring(0, eq).trim().endsWith(name)) {
+                return first.substring(eq + 1).trim();
+            }
+        }
+        return null;
+    }
+
+    private ResponseEntity<String> post(String url, Auth auth, String jsonBody) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        if (bearerToken != null) {
-            headers.setBearerAuth(bearerToken);
+        if (auth != null) {
+            if (auth.token() != null) {
+                headers.setBearerAuth(auth.token());
+            }
+            if (auth.csrf() != null) {
+                headers.set("X-CSRF-Token", auth.csrf());
+            }
+            if (auth.cookieHeader() != null) {
+                headers.set(HttpHeaders.COOKIE, auth.cookieHeader());
+            }
         }
         ResponseEntity<String> resp = restTemplate.postForEntity(url, new HttpEntity<>(jsonBody, headers), String.class);
         HttpStatusCode code = resp.getStatusCode();

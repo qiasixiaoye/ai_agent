@@ -67,6 +67,16 @@ public class AgentRequestLogRepository {
         return jdbcTemplate.query(sql, ROW_MAPPER, sessionId, limit);
     }
 
+    /** 按场景 + 起始时间窗口查询（用于把某次运行 [t0,t1] 与该窗口内的 mcp-tool-call 关联）。 */
+    public List<AgentRequestLogEntity> listBySceneBetween(String scene, LocalDateTime start, LocalDateTime end, int limit) {
+        String sql = """
+                SELECT * FROM agent_request_log
+                WHERE scene = ? AND started_at BETWEEN ? AND ?
+                ORDER BY started_at ASC LIMIT ?
+                """;
+        return jdbcTemplate.query(sql, ROW_MAPPER, scene, Timestamp.valueOf(start), Timestamp.valueOf(end), limit);
+    }
+
     public List<AgentRequestLogEntity> listFailed(LocalDateTime start, LocalDateTime end, int limit) {
         String sql = """
                 SELECT * FROM agent_request_log

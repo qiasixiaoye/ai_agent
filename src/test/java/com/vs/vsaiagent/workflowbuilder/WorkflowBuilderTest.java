@@ -1,5 +1,7 @@
 package com.vs.vsaiagent.workflowbuilder;
 
+import com.vs.vsaiagent.agentplatform.registry.InMemoryToolRegistry;
+import com.vs.vsaiagent.skill.registry.InMemorySkillRegistry;
 import com.vs.vsaiagent.workflowbuilder.model.ValidateResult;
 import com.vs.vsaiagent.workflowbuilder.model.WorkflowEdge;
 import com.vs.vsaiagent.workflowbuilder.model.WorkflowIR;
@@ -13,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -27,8 +30,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class WorkflowBuilderTest {
 
-    private final WorkflowPlanningService planning = new WorkflowPlanningService();
-    private final WorkflowDslGenerateService dslGenerate = new WorkflowDslGenerateService("tongyi", "qwen-max");
+    private final WorkflowPlanningService planning = new WorkflowPlanningService(new InMemoryToolRegistry(), new InMemorySkillRegistry());
+    private final WorkflowDslGenerateService dslGenerate = new WorkflowDslGenerateService("tongyi", "qwen-max", "http://localhost:8081/api");
     private final WorkflowDslValidateService validator = new WorkflowDslValidateService();
 
     // ---------- 样例需求（计划书三类内置任务） ----------
@@ -74,15 +77,89 @@ class WorkflowBuilderTest {
         Map<String, Object> root = YamlUtil.parse(yaml);
         assertEquals("app", root.get("kind"));
         assertTrue(root.containsKey("workflow"));
+        // 默认 toDslYaml(ir) = http 编排 + workflow(单轮) → app.mode=workflow，end 节点收尾
         assertTrue(yaml.contains("mode: workflow"));
         assertTrue(yaml.contains("type: start"));
         assertTrue(yaml.contains("type: llm"));
-        assertTrue(yaml.contains("type: answer"));
+        assertTrue(yaml.contains("type: end"), "workflow 形态应以 end 节点收尾（answer 属于 chatflow）");
+        assertFalse(yaml.contains("type: answer"), "workflow 形态不应出现 answer 节点");
         assertTrue(yaml.contains("{{#start.input#}}"), "llm user 消息应引用 start 输入变量");
-        assertTrue(yaml.contains("{{#llm_task.text#}}"), "answer 应引用 llm 输出");
+        assertTrue(yaml.contains("value_selector"), "end 节点应通过 value_selector 暴露输出");
+        assertTrue(yaml.contains("llm_task"), "end 输出应引用 llm 节点");
 
         ValidateResult result = validator.validateDsl(yaml);
         assertTrue(result.valid(), "生成的 DSL 必须自校验通过, errors=" + result.errors());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void parallelToolsProduceFanOutAndAggregator() {
+        // 手工构造含两个 tool 的 IR（规则规划器只会插一个工具，故此处直接拼装）
+        WorkflowNode start = WorkflowNode.start();
+        WorkflowNode t1 = WorkflowNode.tool("tool_call_1", "网页搜索", "tool:web_search", "{\"query\": \"${start}\"}");
+        WorkflowNode t2 = WorkflowNode.tool("tool_call_2", "图片搜索", "tool:image_search", "{\"query\": \"${start}\"}");
+        WorkflowNode llm = WorkflowNode.llm("llm_task", "并行测试", "汇总两个工具结果");
+        WorkflowNode answer = WorkflowNode.answer();
+        WorkflowIR ir = new WorkflowIR("pid", "并行测试", "并行汇聚需求",
+                List.of(start, t1, t2, llm, answer),
+                List.of(new WorkflowEdge("start", "tool_call_1"),
+                        new WorkflowEdge("tool_call_1", "tool_call_2"),
+                        new WorkflowEdge("tool_call_2", "llm_task"),
+                        new WorkflowEdge("llm_task", "answer")));
+
+        String yaml = dslGenerate.toDslYaml(ir, "http", "workflow");
+        assertTrue(yaml.contains("type: template-transform"), "≥2 工具应生成汇聚节点");
+        assertTrue(validator.validateDsl(yaml).valid(), "并行 DSL 必须自校验通过");
+
+        Map<String, Object> root = YamlUtil.parse(yaml);
+        Map<String, Object> graph = (Map<String, Object>) ((Map<String, Object>) root.get("workflow")).get("graph");
+        List<Map<String, Object>> edges = (List<Map<String, Object>>) graph.get("edges");
+        long fanOut = edges.stream().filter(e -> "start".equals(e.get("source"))).count();
+        long fanIn = edges.stream().filter(e -> "aggregate".equals(e.get("target"))).count();
+        assertEquals(2, fanOut, "start 应 fan-out 到 2 个工具（并行）");
+        assertEquals(2, fanIn, "2 个工具应 fan-in 到汇聚节点");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void manyToolsAgentModeProducesParallelMultiAgent() {
+        // agent 形态需注册表映射 MCP 工具，故用带 InMemory 注册表的完整构造器
+        WorkflowDslGenerateService agentGen = new WorkflowDslGenerateService(
+                new InMemoryToolRegistry(), new InMemorySkillRegistry(),
+                "tongyi", "qwen-max", "http://localhost:8081/api",
+                "vs-agent", "vs-agent-tools", "langgenius/agent/agent",
+                "function_calling", "FunctionCalling", "langgenius/agent:0.0.39@x", 5);
+
+        List<WorkflowNode> ns = new ArrayList<>();
+        List<WorkflowEdge> es = new ArrayList<>();
+        ns.add(WorkflowNode.start());
+        String prev = "start";
+        for (int i = 1; i <= 4; i++) {   // 4 个工具 → 触发多 Agent（每组 2 个）
+            String id = "tool_call_" + i;
+            ns.add(WorkflowNode.tool(id, "工具" + i, "tool:web_search", "{\"query\": \"${start}\"}"));
+            es.add(new WorkflowEdge(prev, id));
+            prev = id;
+        }
+        ns.add(WorkflowNode.llm("llm_task", "多智能体", "综合各智能体结果"));
+        es.add(new WorkflowEdge(prev, "llm_task"));
+        ns.add(WorkflowNode.answer());
+        es.add(new WorkflowEdge("llm_task", "answer"));
+        WorkflowIR ir = new WorkflowIR("id", "多智能体", "需求", ns, es);
+
+        String yaml = agentGen.toDslYaml(ir, "agent", "chatflow");
+        assertTrue(validator.validateDsl(yaml).valid(), "多 Agent DSL 必须自校验通过");
+
+        Map<String, Object> root = YamlUtil.parse(yaml);
+        Map<String, Object> graph = (Map<String, Object>) ((Map<String, Object>) root.get("workflow")).get("graph");
+        List<Map<String, Object>> nodes = (List<Map<String, Object>>) graph.get("nodes");
+        long agentCount = nodes.stream().filter(n -> "agent".equals(((Map<String, Object>) n.get("data")).get("type"))).count();
+        boolean hasAgg = nodes.stream().anyMatch(n -> "template-transform".equals(((Map<String, Object>) n.get("data")).get("type")));
+        assertEquals(2, agentCount, "应拆成 2 个并行 Agent 节点");
+        assertTrue(hasAgg, "应有汇聚节点");
+
+        List<Map<String, Object>> edges = (List<Map<String, Object>>) graph.get("edges");
+        long startFanout = edges.stream().filter(e -> "start".equals(e.get("source"))).count();
+        assertEquals(2, startFanout, "start 应并行 fan-out 到 2 个 Agent");
     }
 
     @Test

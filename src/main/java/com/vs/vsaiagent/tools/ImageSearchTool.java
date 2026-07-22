@@ -30,7 +30,8 @@ public class ImageSearchTool {
     @Tool(description = "search image from web")
     public String searchImage(@ToolParam(description = "Search query keyword") String query) {
         try {
-            return String.join(",", searchMediumImages(query));
+            List<String> images = searchMediumImages(query);
+            return images.isEmpty() ? "No images for: " + query : String.join(",", images);
         } catch (Exception e) {
             return "Error search image: " + e.getMessage();
         }
@@ -58,12 +59,24 @@ public class ImageSearchTool {
                 .execute()
                 .body();
 
-        // 解析响应JSON（假设响应结构包含"photos"数组，每个元素包含"medium"字段）
-        return JSONUtil.parseObj(response)
-                .getJSONArray("photos")
+        return extractMediumUrls(response);
+    }
+
+    /**
+     * 从 Pexels 响应中提取 photos[].src.medium 列表。
+     * 对 photos 缺失、单个元素缺 src 字段（报错/限流 payload）做防御处理，避免空指针。
+     * 抽成静态方法便于离线单测。
+     */
+    static List<String> extractMediumUrls(String responseJson) {
+        cn.hutool.json.JSONArray photos = JSONUtil.parseObj(responseJson).getJSONArray("photos");
+        if (photos == null || photos.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return photos
                 .stream()
                 .map(photoObj -> (JSONObject) photoObj)
                 .map(photoObj -> photoObj.getJSONObject("src"))
+                .filter(java.util.Objects::nonNull)
                 .map(photo -> photo.getStr("medium"))
                 .filter(StrUtil::isNotBlank)
                 .collect(Collectors.toList());

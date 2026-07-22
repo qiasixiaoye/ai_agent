@@ -11,6 +11,8 @@ import java.util.List;
  * @param dslYaml      生成的 Dify DSL YAML
  * @param valid        校验是否通过
  * @param errors       校验错误列表
+ * @param warnings     诊断 / 告警（规划器选择、LLM 回退原因、形态降级等），供错误分析审计观测
+ * @param requestId    observability 审计请求 id（诊断已落库，可据此回查）
  */
 public record WorkflowGenerateResponse(
         String workflowId,
@@ -18,6 +20,8 @@ public record WorkflowGenerateResponse(
         WorkflowIR ir,
         String dslYaml,
         boolean valid,
-        List<String> errors
+        List<String> errors,
+        List<String> warnings,
+        String requestId
 ) {
 }

@@ -6,10 +6,10 @@ import com.vs.vsaiagent.agentplatform.model.ToolExecuteResult;
 import com.vs.vsaiagent.agentplatform.model.ToolMetadata;
 import com.vs.vsaiagent.agentplatform.model.ToolSourceType;
 import com.vs.vsaiagent.agentplatform.tool.BaseAgentTool;
+import com.vs.vsaiagent.mcp.management.ManagedMcpToolService;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.tool.ToolCallbackProvider;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.ai.tool.ToolCallback;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -19,11 +19,11 @@ import java.util.Map;
 public class McpRoutingAgentTool extends BaseAgentTool {
 
     private final ChatClient chatClient;
-    @Autowired(required = false)
-    private ToolCallbackProvider toolCallbackProvider;
+    private final ManagedMcpToolService managedMcpToolService;
 
-    public McpRoutingAgentTool(ChatModel chatModel) {
+    public McpRoutingAgentTool(ChatModel chatModel, ManagedMcpToolService managedMcpToolService) {
         this.chatClient = ChatClient.builder(chatModel).build();
+        this.managedMcpToolService = managedMcpToolService;
     }
 
     @Override
@@ -41,9 +41,8 @@ public class McpRoutingAgentTool extends BaseAgentTool {
 
     @Override
     public ToolExecuteResult execute(ToolExecuteRequest request) {
-        if (toolCallbackProvider == null) {
-            throw new IllegalStateException("当前未启用 MCP ToolCallbackProvider");
-        }
+        ToolCallback[] callbacks = managedMcpToolService.allowedToolCallbacks();
+        if (callbacks.length == 0) throw new IllegalStateException("当前没有可用且通过策略的 MCP 工具");
         long start = System.currentTimeMillis();
         Map<String, Object> args = request.getArguments();
         String instruction = String.valueOf(args.get("instruction"));
@@ -55,7 +54,7 @@ public class McpRoutingAgentTool extends BaseAgentTool {
                         工具参数(JSON): %s
                         仅返回最终工具执行结果。
                         """.formatted(instruction, argumentJson))
-                .tools(toolCallbackProvider)
+                .tools(callbacks)
                 .call()
                 .content();
         return ToolExecuteResult.builder()

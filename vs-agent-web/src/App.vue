@@ -1,5 +1,11 @@
 <template>
-  <router-view />
+  <!-- 缓存"产出型"页面，跳去审计/其它页再回来时不丢失已生成的结果；
+       Observability 不缓存，保证每次带 requestId 进入都重新查询 -->
+  <router-view v-slot="{ Component }">
+    <keep-alive :include="['WorkflowStudio', 'AgentPlatform']">
+      <component :is="Component" />
+    </keep-alive>
+  </router-view>
 </template>
 
 <style>

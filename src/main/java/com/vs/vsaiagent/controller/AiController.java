@@ -36,6 +36,15 @@ public class AiController {
         return assistantApp.doChat(message, chatId);
     }
 
+    /**
+     * Skill 对话（同步）：让 LLM 在对话中自主调用已注册 Skill（含会内部再编排工具的结构化 Skill）。
+     * 例：message=「帮我做北京 2026-06-25 的银河拍摄计划，纬度39.9 经度116.4」→ LLM 选 astro-shoot-plan。
+     */
+    @GetMapping("/assistant_app/chat_skills/sync")
+    public String doChatWithSkillsSync(String message, String chatId) {
+        return assistantApp.doChatWithSkills(message, chatId);
+    }
+
     @GetMapping(value = "/assistant_app/chat/sse", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> doChatWithAppSse(String message, String chatId) {
         return assistantApp.doChatByStream(message, chatId);

@@ -1,0 +1,151 @@
+# vs-net 一体化编排：pgvector(DB) + 后端 + 前端 + dify-bridge
+#
+# 解决的根本问题：之前 4 个容器用 docker run 手工拉起、无依赖编排，
+# 整栈重启时后端常常比 pgvector 先就绪 → UnknownHostException: pgvector → 启动失败。
+# 这里用 pgvector 的 healthcheck + 后端 depends_on(condition: service_healthy)
+# 保证「数据库健康后，后端才启动」，彻底消除启动顺序竞争。
+#
+# 用法：
+#   1) cp .env.example .env  并填入真实 key（OPENAI/SEARCH/IMAGE）
+#   2) 若已有同名手工容器，先删除：docker rm -f pgvector vs-ai-agent vs-agent-web vs-dify-bridge
+#   3) docker compose up -d --build
+#   4) docker compose ps / docker compose logs -f vs-ai-agent
+
+services:
+  pgvector:
+    image: ankane/pgvector
+    container_name: pgvector
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ai_agent
+    ports:
+      - "15432:5432"
+    volumes:
+      - pgvector-data:/var/lib/postgresql/data
+    healthcheck:
+      # 数据库真正可接受连接后才算 healthy（后端依赖此状态）
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ai_agent"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - vs-net
+    restart: unless-stopped
+
+  vs-ai-agent:
+    image: vs-ai-agent:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: vs-ai-agent
+    depends_on:
+      pgvector:
+        condition: service_healthy   # 关键：DB 健康后才启动后端
+    environment:
+      SERVER_PORT: "8081"
+      # 不再用 servlet context-path=/api（会让 MCP SSE 通告端点与实际端点错位、Dify 握手 404）；
+      # 改由 ApiPathPrefixConfig 只给本项目 @RestController 加 /api 前缀，MCP 路由留在根路径。
+      # 主机名 pgvector 由本 compose 的服务名提供 DNS 解析
+      SPRING_DATASOURCE_URL: jdbc:postgresql://pgvector:5432/ai_agent
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      APP_LLM_PROVIDER: ${APP_LLM_PROVIDER:-deepseek}
+      SPRING_AI_OPENAI_BASE_URL: ${SPRING_AI_OPENAI_BASE_URL:-https://api.deepseek.com}
+      SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL: ${SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL:-deepseek-chat}
+      SPRING_AI_OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SPRING_AI_DASHSCOPE_CHAT_OPTIONS_MODEL: ${SPRING_AI_DASHSCOPE_CHAT_OPTIONS_MODEL:-qwen-plus}
+      SPRING_AI_DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-dummy}
+      SEARCH_API_API_KEY: ${SEARCH_API_API_KEY:-}
+      IMAGE_API_API_KEY: ${IMAGE_API_API_KEY:-}
+      APP_DIFY_BASE_URL: ${APP_DIFY_BASE_URL:-}
+      APP_DIFY_API_KEY: ${APP_DIFY_API_KEY:-}
+      APP_DIFY_DEFAULT_WORKFLOW_ID: ${APP_DIFY_DEFAULT_WORKFLOW_ID:-}
+      # 一句话生成的 DSL 里 HTTP 节点要在 Dify 容器内回调后端 REST，
+      # 必须用 host.docker.internal（容器内的 localhost 指向 Dify 自己，连不到后端）。
+      APP_WORKFLOW_BUILDER_RUNTIME_BASE_URL: ${APP_WORKFLOW_BUILDER_RUNTIME_BASE_URL:-http://host.docker.internal:8081/api}
+      # 生成的 DSL 里 LLM 节点的模型必须与目标 Dify 已配置的 provider/模型一致，否则导入后"模型加载失败"。
+      # 本机 Dify 仅配置了 deepseek 插件(langgenius/deepseek/deepseek)。
+      APP_WORKFLOW_BUILDER_MODEL_PROVIDER: ${APP_WORKFLOW_BUILDER_MODEL_PROVIDER:-langgenius/deepseek/deepseek}
+      APP_WORKFLOW_BUILDER_MODEL_NAME: ${APP_WORKFLOW_BUILDER_MODEL_NAME:-deepseek-chat}
+      # Agent 形态(mode=agent)：把工具折叠进一个 Agent 节点挂载 MCP 工具，由 LLM 自主调用。
+      # provider-name 必须是目标 Dify 里 MCP 服务的 server_identifier(Dify 按它解析，非 uuid)；
+      # strategy/plugin-uid 对应已安装的 langgenius/agent 策略插件。需与目标 Dify 实际安装一致。
+      APP_WORKFLOW_BUILDER_MCP_PROVIDER_NAME: ${APP_WORKFLOW_BUILDER_MCP_PROVIDER_NAME:-vs-agent}
+      APP_WORKFLOW_BUILDER_MCP_PROVIDER_SHOW_NAME: ${APP_WORKFLOW_BUILDER_MCP_PROVIDER_SHOW_NAME:-vs-agent-tools}
+      APP_WORKFLOW_BUILDER_AGENT_STRATEGY_PROVIDER: ${APP_WORKFLOW_BUILDER_AGENT_STRATEGY_PROVIDER:-langgenius/agent/agent}
+      APP_WORKFLOW_BUILDER_AGENT_STRATEGY_NAME: ${APP_WORKFLOW_BUILDER_AGENT_STRATEGY_NAME:-function_calling}
+      APP_WORKFLOW_BUILDER_AGENT_STRATEGY_LABEL: ${APP_WORKFLOW_BUILDER_AGENT_STRATEGY_LABEL:-FunctionCalling}
+      APP_WORKFLOW_BUILDER_AGENT_PLUGIN_UID: ${APP_WORKFLOW_BUILDER_AGENT_PLUGIN_UID:-langgenius/agent:0.0.39@ceea6a76b3a495de2df2a55bcea82e903d49b06f4d8e1463c2aa085657f27164}
+      APP_WORKFLOW_BUILDER_AGENT_MAX_ITERATIONS: ${APP_WORKFLOW_BUILDER_AGENT_MAX_ITERATIONS:-5}
+      # Dify Console 凭据：后端据此登录 Dify 并一键导入生成的 DSL（容器内访问宿主机用 host.docker.internal）。
+      APP_DIFY_CONSOLE_BASE_URL: ${APP_DIFY_CONSOLE_BASE_URL:-http://host.docker.internal:3001}
+      APP_DIFY_CONSOLE_EMAIL: ${APP_DIFY_CONSOLE_EMAIL:-123@qq.com}
+      APP_DIFY_CONSOLE_PASSWORD: ${APP_DIFY_CONSOLE_PASSWORD:-duanCHANGrEn1}
+    ports:
+      - "8081:8081"
+    networks:
+      - vs-net
+    restart: unless-stopped
+
+  vs-agent-web:
+    image: vs-agent-web:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: vs-agent-web
+    depends_on:
+      - vs-ai-agent
+    ports:
+      - "5174:80"
+    networks:
+      - vs-net
+    restart: unless-stopped
+
+  vs-dify-bridge:
+    image: vs-dify-bridge:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.dify-bridge
+    container_name: vs-dify-bridge
+    environment:
+      PORT: "8090"
+    ports:
+      - "8090:8090"
+    networks:
+      - vs-net
+    restart: unless-stopped
+
+  # MASPO 下游提示词优化 sidecar（前端 ② 下游·自环优化 调用它）。
+  # 之前需要在宿主机手动 `python serve.py`；改成容器后可直接在 Docker Desktop 里启停。
+  vs-maspo-demo:
+    image: vs-maspo-demo:latest
+    build:
+      context: ../maspo-demo        # 仓库根下的 maspo-demo（迁移包里也是 ../maspo-demo，路径一致）
+      dockerfile: Dockerfile
+    container_name: vs-maspo-demo
+    environment:
+      MASPO_PORT: "8770"
+      # 容器内 localhost 指向容器自己，所以服务端 API 调用要走 vs-net 服务名 / host.docker.internal：
+      BACKEND: "http://vs-ai-agent:8081/api"          # 同网络后端
+      DIFY_BASE: "http://host.docker.internal:3001"   # 宿主机上的 Dify（服务端登录/草稿运行）
+      DIFY_PUBLIC: "http://localhost:3001"            # 浏览器打开的 Dify 链接（用宿主机 localhost）
+      DIFY_EMAIL: ${APP_DIFY_CONSOLE_EMAIL:-123@qq.com}
+      DIFY_PW: ${APP_DIFY_CONSOLE_PASSWORD:-duanCHANGrEn1}
+    ports:
+      - "8770:8770"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # 确保容器能解析宿主机（Linux/部分环境需要）
+    networks:
+      - vs-net
+    restart: unless-stopped
+
+networks:
+  vs-net:
+    name: vs-net
+    external: true   # 复用已存在的 vs-net 网络（由旧 docker run 流程创建）
+
+volumes:
+  pgvector-data:
+    name: pgvector-data

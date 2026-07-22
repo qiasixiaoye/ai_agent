@@ -4,13 +4,25 @@
       <router-link to="/" class="back-link">
         <span>←</span> 返回首页
       </router-link>
-      <h1>AI 助手</h1>
+      <h1>AI 对话</h1>
+    </div>
+
+    <div class="mode-bar">
+      <button
+        v-for="m in modes"
+        :key="m.key"
+        :class="['mode-btn', { active: mode === m.key }]"
+        @click="switchMode(m.key)"
+      >
+        <strong>{{ m.label }}</strong>
+        <span>{{ m.hint }}</span>
+      </button>
     </div>
 
     <div class="chat-messages" ref="messagesContainer">
       <div v-if="messages.length === 0" class="empty-state">
         <div class="empty-icon">🤖</div>
-        <p>欢迎使用 AI 助手，请发送消息开始对话</p>
+        <p>欢迎使用 AI 对话，请发送消息开始</p>
       </div>
 
       <template v-else>
@@ -21,7 +33,6 @@
           :isUser="message.isUser"
           :timestamp="message.timestamp"
         />
-
         <LoadingIndicator v-if="loading" />
       </template>
     </div>
@@ -29,62 +40,64 @@
     <ChatInput :loading="loading" @send="sendMessage" />
 
     <div class="chat-footer">
-      <div class="chat-options">
-        <label :class="['rag-toggle', { active: useRag }]" @click="useRag = !useRag">
-          <span class="rag-icon">RAG</span>
-          <span class="rag-text"></span>
-        </label>
-        <span class="option-hint">有问题尽管问，shift+enter 换行</span>
-      </div>
+      <span class="option-hint">当前模式：{{ currentMode.label }} —— {{ currentMode.hint }}；shift+enter 换行</span>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useChatStore } from '../stores/chat'
-import { connectToAssistantAppChat, connectToAssistantAppRagChat } from '../services/api'
+import {
+  connectToAssistantAppChat,
+  connectToAssistantAppRagChat,
+  connectToManusChat
+} from '../services/api'
 import ChatMessage from '../components/ChatMessage.vue'
 import ChatInput from '../components/ChatInput.vue'
 import LoadingIndicator from '../components/LoadingIndicator.vue'
 import { useHead } from '@vueuse/head'
 
 useHead({
-  title: 'AI 助手 - 通用 AI 对话与知识问答 | AI Agent Platform',
+  title: 'AI 对话 - 普通 / RAG 知识问答 / 智能体 | AI Agent Platform',
   meta: [
-    { name: 'description', content: 'AI 助手提供通用 AI 对话、RAG 知识检索、工具调用与 MCP 协议集成，覆盖技术问答、文档生成、信息检索等多种场景。' },
-    { name: 'keywords', content: 'AI 对话,知识问答,RAG,工具调用,MCP,人工智能助手,Spring AI' },
-    { property: 'og:title', content: 'AI 助手 - 通用 AI 对话与知识问答' },
-    { property: 'og:description', content: '基于 Spring AI 的通用 AI 助手，支持 RAG / 工具调用 / MCP 协议。' },
-    { property: 'og:type', content: 'website' },
-    { property: 'og:url', content: window.location.href },
-    { property: 'og:site_name', content: 'AI Agent Platform' },
-    { property: 'og:locale', content: 'zh_CN' },
-    { name: 'twitter:card', content: 'summary_large_image' },
-    { name: 'twitter:title', content: 'AI 助手 - 通用 AI 对话与知识问答' },
-    { name: 'twitter:description', content: '基于 Spring AI 的通用 AI 助手，支持 RAG / 工具调用 / MCP 协议。' },
-    { name: 'robots', content: 'index, follow' },
-    { name: 'canonical', content: window.location.href }
+    { name: 'description', content: '一个对话入口，三种模式：普通对话、RAG 知识检索、Manus 工具自动编排智能体。基于 Spring AI。' }
   ]
 })
+
+const modes = [
+  { key: 'normal', label: '普通对话', hint: '多轮对话，纯模型回答' },
+  { key: 'rag', label: 'RAG 问答', hint: '检索知识库后再回答' },
+  { key: 'agent', label: '智能体(Manus)', hint: '自动多步推理 + 工具调用' }
+]
 
 const chatStore = useChatStore()
 const messagesContainer = ref(null)
 const loading = ref(false)
 const chatId = ref('')
 const eventSource = ref(null)
-const useRag = ref(false)
-
+const mode = ref('normal')
 const messages = ref([])
+
+// Manus 模式自带的多轮历史（随对话累积，作为 contentText 回传）
+let agentHistory = []
+
+const currentMode = computed(() => modes.find((m) => m.key === mode.value))
 
 onMounted(() => {
   chatId.value = chatStore.createAssistantAppChat()
-
-  const welcomeMessage = "您好，我是 AI 助手。请告诉我您想做什么，我可以帮您解答问题、检索知识库、调用工具或生成文档。"
-  chatStore.addAssistantAppMessage(chatId.value, welcomeMessage, false)
-
+  chatStore.addAssistantAppMessage(
+    chatId.value,
+    '您好，我是 AI 助手。上方可切换「普通 / RAG / 智能体」三种模式，请发送消息开始。',
+    false
+  )
   syncMessagesFromStore()
 })
+
+const switchMode = (key) => {
+  if (loading.value) return
+  mode.value = key
+}
 
 const syncMessagesFromStore = () => {
   if (chatId.value && chatStore.assistantAppChats[chatId.value]) {
@@ -111,12 +124,22 @@ const scrollToBottom = () => {
   }
 }
 
+const openConnection = (message) => {
+  if (mode.value === 'agent') {
+    agentHistory.push({ user: message })
+    return connectToManusChat(message, JSON.stringify(agentHistory))
+  }
+  if (mode.value === 'rag') {
+    return connectToAssistantAppRagChat(message, chatId.value)
+  }
+  return connectToAssistantAppChat(message, chatId.value)
+}
+
 const sendMessage = async (message) => {
   if (loading.value) return
 
   chatStore.addAssistantAppMessage(chatId.value, message, true)
   syncMessagesFromStore()
-
   loading.value = true
 
   try {
@@ -124,18 +147,14 @@ const sendMessage = async (message) => {
       eventSource.value.close()
     }
 
-    eventSource.value = useRag.value
-      ? connectToAssistantAppRagChat(message, chatId.value)
-      : connectToAssistantAppChat(message, chatId.value)
+    eventSource.value = openConnection(message)
 
     let aiResponse = ''
     let messageAdded = false
 
     eventSource.value.onmessage = (event) => {
       if (event.data) {
-        const data = event.data
-        aiResponse += data
-
+        aiResponse += event.data
         if (!messageAdded) {
           loading.value = false
           chatStore.addAssistantAppMessage(chatId.value, aiResponse, false)
@@ -146,30 +165,25 @@ const sendMessage = async (message) => {
             lastMessage.content = aiResponse
           }
         }
-
         syncMessagesFromStore()
         scrollToBottom()
       }
     }
 
-    eventSource.value.onerror = () => {
+    const finalize = () => {
       eventSource.value.close()
+      if (mode.value === 'agent') {
+        agentHistory.push({ assistant: aiResponse })
+      }
       loading.value = false
     }
 
-    eventSource.value.addEventListener('complete', () => {
-      eventSource.value.close()
-      loading.value = false
-    })
+    eventSource.value.onerror = finalize
+    eventSource.value.addEventListener('complete', finalize)
   } catch (error) {
     console.error('连接聊天服务失败:', error)
     loading.value = false
-
-    chatStore.addAssistantAppMessage(
-      chatId.value,
-      '抱歉，连接服务器时出现问题，请稍后再试。',
-      false
-    )
+    chatStore.addAssistantAppMessage(chatId.value, '抱歉，连接服务器时出现问题，请稍后再试。', false)
     syncMessagesFromStore()
   }
 }
@@ -183,29 +197,32 @@ const sendMessage = async (message) => {
   width: 1200px;
   max-width: 100%;
   margin: 0 auto;
-  background-color: #f5f5f5;
-  color: #333;
+  background-color: transparent;
+  color: var(--color-text);
 }
 
 .chat-header {
   display: flex;
   align-items: center;
-  padding: 10px 20px;
-  background-color: var(--color-primary);
-  color: white;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  padding: 12px 20px;
+  background: var(--gradient-surface);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
 }
 
 .chat-header h1 {
   margin: 0 auto;
-  font-size: 1.5rem;
+  font-size: 1.4rem;
+  letter-spacing: 0.04em;
 }
 
 .back-link {
-  color: white;
+  color: var(--color-primary);
   text-decoration: none;
   display: flex;
   align-items: center;
+  font-size: 0.85rem;
 }
 
 .back-link span {
@@ -213,56 +230,60 @@ const sendMessage = async (message) => {
   margin-right: 5px;
 }
 
+.mode-bar {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px;
+  background: rgba(12, 18, 34, 0.55);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.mode-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.mode-btn:hover { border-color: var(--color-primary-soft); }
+
+.mode-btn strong { font-size: 0.92rem; }
+.mode-btn span { font-size: 0.72rem; color: var(--color-text-subtle); }
+
+.mode-btn.active {
+  background: linear-gradient(160deg, rgba(34, 211, 238, 0.18), rgba(99, 102, 241, 0.14));
+  border-color: var(--color-primary-soft);
+  box-shadow: var(--glow-cyan);
+}
+.mode-btn.active strong { color: var(--color-primary); }
+.mode-btn.active span { color: var(--color-text-muted); }
+
 .chat-messages {
   flex: 1;
   overflow-y: auto;
   padding: 20px;
   display: flex;
   flex-direction: column;
-  background-color: #f5f5f5;
+  background-color: transparent;
 }
 
 .chat-footer {
-  background-color: white;
-  border-top: 1px solid #eaeaea;
-}
-
-.chat-options {
-  display: flex;
-  padding: 10px 16px;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.rag-toggle {
-  display: flex;
-  align-items: center;
-  background-color: var(--color-primary-light);
-  color: var(--color-primary);
-  border-radius: 18px;
-  padding: 6px 12px;
-  font-size: 14px;
-  cursor: pointer;
-  user-select: none;
-  transition: all 0.2s ease;
-  border: 1px solid transparent;
-}
-
-.rag-toggle.active {
-  background-color: var(--color-primary);
-  color: white;
-}
-
-.rag-toggle:hover {
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-}
-
-.rag-icon {
-  font-weight: bold;
+  background: rgba(12, 18, 34, 0.55);
+  backdrop-filter: blur(6px);
+  border-top: 1px solid var(--color-border);
+  padding: 8px 16px;
 }
 
 .option-hint {
-  color: #888;
+  color: var(--color-text-subtle);
   font-size: 12px;
 }
 
@@ -285,15 +306,6 @@ const sendMessage = async (message) => {
   .chat-container { width: 100%; }
   .chat-header h1 { font-size: 1.2rem; }
   .chat-messages { padding: 15px 10px; }
-  .chat-options { padding: 8px 10px; flex-wrap: wrap; }
-  .option-hint { margin-top: 5px; width: 100%; text-align: center; font-size: 11px; }
-}
-
-@media (max-width: 480px) {
-  .chat-header { padding: 8px 12px; }
-  .chat-messages { padding: 10px 8px; }
-  .empty-icon { font-size: 3rem; }
-  .chat-options { flex-direction: column; align-items: flex-start; }
-  .rag-toggle { margin-bottom: 8px; }
+  .mode-btn span { display: none; }
 }
 </style>

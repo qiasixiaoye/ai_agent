@@ -35,19 +35,27 @@ public class WebSearchTool {
         paramMap.put("engine", "baidu");
         try {
             String response = HttpUtil.get(SEARCH_API_URL, paramMap);
-            // 取出返回结果的前 5 条
-            JSONObject jsonObject = JSONUtil.parseObj(response);
-            // 提取 organic_results 部分
-            JSONArray organicResults = jsonObject.getJSONArray("organic_results");
-            List<Object> objects = organicResults.subList(0, 5);
-            // 拼接搜索结果为字符串
-            String result = objects.stream().map(obj -> {
-                JSONObject tmpJSONObject = (JSONObject) obj;
-                return tmpJSONObject.toString();
-            }).collect(Collectors.joining(","));
-            return result;
+            List<String> results = extractTopResults(response, 5);
+            return results.isEmpty() ? "No web results for: " + query : String.join(",", results);
         } catch (Exception e) {
             return "Error searching Baidu: " + e.getMessage();
         }
+    }
+
+    /**
+     * 从 SearchAPI 响应中提取前 {@code limit} 条 organic_results。
+     * 对结果不足、字段缺失（限流/报错 payload）做防御处理，避免越界 / 空指针。
+     * 抽成静态方法便于离线单测。
+     */
+    static List<String> extractTopResults(String responseJson, int limit) {
+        JSONObject jsonObject = JSONUtil.parseObj(responseJson);
+        JSONArray organicResults = jsonObject.getJSONArray("organic_results");
+        if (organicResults == null || organicResults.isEmpty()) {
+            return List.of();
+        }
+        int n = Math.min(limit, organicResults.size());
+        return organicResults.subList(0, n).stream()
+                .map(Object::toString)
+                .collect(Collectors.toList());
     }
 }

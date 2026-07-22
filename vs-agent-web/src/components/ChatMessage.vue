@@ -72,16 +72,19 @@ const formattedMessage = computed(() => {
 .message-content {
   padding: 10px 14px;
   border-radius: 18px;
-  background-color: #f1f1f1;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
 }
 
 .user-message .message-content {
-  background-color: #DCF8C6;
+  background: linear-gradient(160deg, rgba(34, 211, 238, 0.18), rgba(99, 102, 241, 0.14));
+  border-color: var(--color-primary-soft);
   border-top-right-radius: 0;
 }
 
 .ai-message .message-content {
-  background-color: #FFFFFF;
+  background: var(--color-surface);
   border-top-left-radius: 0;
 }
 

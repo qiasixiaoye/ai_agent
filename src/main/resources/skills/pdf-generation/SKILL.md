@@ -6,6 +6,9 @@ version: 1.0.0
 tags:
   - file
   - document
+  - PDF
+  - 文档
+  - 导出
 inputs:
   - name: fileName
     type: string
@@ -19,6 +22,15 @@ outputs:
   - name: filePath
     type: string
     description: 生成后的 PDF 绝对路径
+steps:
+  - name: 校验入参
+    description: 校验 fileName 与 content 非空
+  - name: 初始化文档
+    description: 用 iText 7 创建 PDF 文档并加载内置中文字体 STSongStd-Light
+  - name: 写入内容
+    description: 把 content 文本写入页面段落
+  - name: 落盘返回路径
+    description: 保存到 FILE_SAVE_DIR/pdf/{fileName} 并返回绝对路径 filePath
 examples:
   - 生成 hello.pdf，内容为 hello world
 timeoutMs: 30000

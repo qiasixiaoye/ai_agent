@@ -3,6 +3,7 @@ package com.vs.vsaiagent.skill.loader;
 import com.vs.vsaiagent.skill.SkillMetadata;
 import com.vs.vsaiagent.skill.SkillParam;
 import com.vs.vsaiagent.skill.SkillSourceType;
+import com.vs.vsaiagent.skill.SkillStep;
 import lombok.extern.slf4j.Slf4j;
 import org.yaml.snakeyaml.Yaml;
 
@@ -62,11 +63,15 @@ public final class SkillMdParser {
             return null;
         }
         String yamlBlock = rest.substring(0, closing);
+        // front-matter 之后的 markdown 正文 = 技能操作手册（instructions），以前被丢弃，现在保留。
+        String body = rest.substring(closing + ("\n" + FRONT_MATTER_DELIMITER).length());
+        int bodyNl = body.indexOf('\n');
+        body = bodyNl >= 0 ? body.substring(bodyNl + 1) : "";   // 跳过闭合 --- 所在行的剩余部分
         try {
             Yaml yaml = new Yaml();
             Map<String, Object> root = yaml.loadAs(yamlBlock, LinkedHashMap.class);
             if (root == null) return null;
-            return toMetadata(root);
+            return toMetadata(root, body.strip());
         } catch (Exception e) {
             log.warn("[skill-md] parse yaml failed: {}", e.getMessage());
             return null;
@@ -74,7 +79,7 @@ public final class SkillMdParser {
     }
 
     @SuppressWarnings("unchecked")
-    private static SkillMetadata toMetadata(Map<String, Object> root) {
+    private static SkillMetadata toMetadata(Map<String, Object> root, String instructions) {
         SkillMetadata.Builder b = SkillMetadata.builder()
                 .name(str(root.get("name")))
                 .displayName(str(root.get("displayName")))
@@ -83,7 +88,9 @@ public final class SkillMdParser {
                 .tags(toStringList(root.get("tags")))
                 .examples(toStringList(root.get("examples")))
                 .inputs(toParams(root.get("inputs")))
-                .outputs(toParams(root.get("outputs")));
+                .outputs(toParams(root.get("outputs")))
+                .steps(toSteps(root.get("steps")))
+                .instructions(instructions);
 
         Object timeout = root.get("timeoutMs");
         if (timeout instanceof Number n) {
@@ -116,6 +123,24 @@ public final class SkillMdParser {
                     Boolean.TRUE.equals(map.get("required")),
                     map.get("defaultValue")
             ));
+        }
+        return result;
+    }
+
+    /** 解析 front-matter 的 steps：支持「字符串」或「{name,uses,description} 对象」两种写法。 */
+    @SuppressWarnings("unchecked")
+    private static List<SkillStep> toSteps(Object o) {
+        if (!(o instanceof List<?> list)) return List.of();
+        List<SkillStep> result = new ArrayList<>();
+        for (Object item : list) {
+            if (item instanceof Map<?, ?> m) {
+                Map<String, Object> map = (Map<String, Object>) m;
+                String name = str(map.get("name"));
+                if (name == null || name.isBlank()) continue;
+                result.add(new SkillStep(name, str(map.get("uses")), str(map.get("description"))));
+            } else if (item != null) {
+                result.add(new SkillStep(item.toString(), null, null));
+            }
         }
         return result;
     }

@@ -32,8 +32,10 @@ spring:
     password: password
 server:
   port: 8081
-  servlet:
-    context-path: /api
+  # context-path 已停用：改由 ApiPathPrefixConfig 仅对本项目 controller 加 /api 前缀，
+  # 以免 Spring AI MCP server 的 /sse、/mcp/message 被 context-path 影响导致 Dify 握手错位。
+  # servlet:
+  #   context-path: /api
 # springdoc-openapi config
 springdoc:
   swagger-ui:
@@ -81,6 +83,40 @@ app:
   kb:
     dashscope:
       index: assistant_kb
+  memory:
+    # Persistent four-tier memory store. Keep this outside classpath resources.
+    base-dir: ${user.dir}/tmp/agent-memory
+    working-message-limit: 20
+    summary-max-chars: 4000
+    tier-item-limit: 100
+  context:
+    # The model window is partitioned explicitly; output and safety are never available to input context.
+    window-tokens: 32768
+    output-reserve-tokens: 4096
+    safety-margin-tokens: 2048
+    history-token-budget: 5000
+    summary-token-budget: 1500
+    semantic-token-budget: 1000
+    episodic-token-budget: 1000
+    rag-token-budget: 5000
+    skill-token-budget: 3500
+    skill-per-item-token-budget: 2000
+    tool-schema-token-budget: 2000
+    tool-result-token-budget: 3500
+    # Compatibility budget used by the manual memory preview endpoint.
+    memory-token-budget: 2500
+    semantic-top-k: 5
+    episodic-top-k: 3
+  mcp:
+    catalog-ttl-ms: 30000
+    tool-timeout-ms: 15000
+    policy:
+      allow:
+      deny: terminal,shell,execute_command,run_command
+      high-risk: delete,remove,write,send,publish,payment,deploy
+    circuit:
+      failure-threshold: 3
+      reset-ms: 60000
 
 # Optional OpenAI-compatible model config, used when app.llm.provider=deepseek.
 # spring:

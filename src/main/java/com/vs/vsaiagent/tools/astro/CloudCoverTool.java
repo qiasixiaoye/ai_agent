@@ -1,6 +1,7 @@
 package com.vs.vsaiagent.tools.astro;
 
-import cn.hutool.http.HttpUtil;
+import cn.hutool.http.Header;
+import cn.hutool.http.HttpRequest;
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
@@ -43,7 +44,14 @@ public class CloudCoverTool {
         paramMap.put("start_date", date.toString());
         paramMap.put("end_date", date.plusDays(1).toString());
 
-        String response = HttpUtil.get(OPEN_METEO_URL, paramMap);
+        // 显式禁用 gzip（Accept-Encoding: identity），规避 Hutool 自动解压偶发的
+        // "ZipException: invalid stored block lengths"；并设置超时避免长时间阻塞。
+        String response = HttpRequest.get(OPEN_METEO_URL)
+                .form(paramMap)
+                .header(Header.ACCEPT_ENCODING, "identity")
+                .timeout(15000)
+                .execute()
+                .body();
         JSONObject jsonObject = JSONUtil.parseObj(response);
         JSONObject hourly = jsonObject.getJSONObject("hourly");
         if (hourly == null) {

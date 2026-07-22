@@ -8,6 +8,31 @@
     </header>
 
     <main class="sk-main">
+      <section class="routing-panel">
+        <div class="routing-title">Skill 命中验证</div>
+        <p class="hint">先召回并评分候选 Skill，仅把超过阈值的 Top-K 能力交给模型。</p>
+        <div class="routing-actions">
+          <input v-model="routeQuery" class="routing-input" placeholder="例如：帮我规划北京郊区今晚的银河摄影"
+                 @keyup.enter="previewRoute" />
+          <button class="run-btn" :disabled="routing || !routeQuery.trim()" @click="previewRoute">
+            {{ routing ? '路由中...' : '预览命中' }}
+          </button>
+          <button class="eval-btn" :disabled="evaluating" @click="runRoutingEval">
+            {{ evaluating ? '评测中...' : '运行评测集' }}
+          </button>
+        </div>
+        <div v-if="routeResult" class="route-result">
+          <strong>{{ routeResult.matched ? `命中：${routeResult.selectedSkillNames.join(', ')}` : '未命中，回退普通对话' }}</strong>
+          <div v-for="c in routeResult.candidates" :key="c.skillName" class="candidate-row" :class="{ selected: c.selected }">
+            <code>{{ c.skillName }}</code><span>score={{ c.score }}</span><span>{{ (c.reasons || []).join(' · ') || '无匹配证据' }}</span>
+          </div>
+        </div>
+        <div v-if="evalResult" class="eval-result">
+          评测集 {{ evalResult.suiteName }}：{{ evalResult.correct }}/{{ evalResult.total }}，
+          accuracy={{ (evalResult.accuracy * 100).toFixed(1) }}%，误命中 {{ evalResult.falsePositives }}，漏命中 {{ evalResult.falseNegatives }}
+        </div>
+      </section>
+
       <div v-if="loadingList" class="hint">加载中...</div>
       <div v-else-if="skills.length === 0" class="hint">暂无已注册 Skill。请确认后端启动并扫描到 SKILL.md。</div>
 
@@ -30,6 +55,23 @@
           <code class="sk-code">{{ s.name }}</code>
 
           <div v-if="current && current.name === s.name" class="sk-detail" @click.stop>
+            <!-- 技能内部结构：有序步骤(每步调哪个工具) + 操作手册。这是 Skill 区别于裸工具的地方。 -->
+            <div v-if="(current.steps && current.steps.length) || current.instructions" class="sk-internals">
+              <div class="internals-title">🧩 技能内部结构</div>
+              <ol v-if="current.steps && current.steps.length" class="step-list">
+                <li v-for="(st, i) in current.steps" :key="i" class="step-item">
+                  <span class="step-name">{{ st.name }}</span>
+                  <code v-if="st.uses" class="step-uses">{{ st.uses }}</code>
+                  <span v-else class="step-uses none">综合</span>
+                  <span v-if="st.description" class="step-desc">{{ st.description }}</span>
+                </li>
+              </ol>
+              <details v-if="current.instructions" class="manual">
+                <summary>📖 操作手册（SKILL.md 正文）</summary>
+                <pre class="manual-body">{{ current.instructions }}</pre>
+              </details>
+            </div>
+
             <div v-if="!current.inputs || current.inputs.length === 0" class="hint">此 Skill 不需要参数。</div>
             <ParamField
               v-for="p in (current.inputs || [])"
@@ -85,7 +127,7 @@ import TagChip from '../components/ui/TagChip.vue'
 import StatusBadge from '../components/ui/StatusBadge.vue'
 import CodeBlock from '../components/ui/CodeBlock.vue'
 import ParamField from '../components/ui/ParamField.vue'
-import { listSkills, getSkill, executeSkill, fileDownloadUrl } from '../services/api'
+import { listSkills, getSkill, executeSkill, fileDownloadUrl, previewSkillRoute, evaluateSkillRouting } from '../services/api'
 
 const skills = ref([])
 const current = ref(null)
@@ -95,6 +137,36 @@ const error = ref(null)
 const loadingList = ref(false)
 const executing = ref(false)
 const copied = ref(false)
+const routeQuery = ref('')
+const routeResult = ref(null)
+const evalResult = ref(null)
+const routing = ref(false)
+const evaluating = ref(false)
+
+const previewRoute = async () => {
+  if (!routeQuery.value.trim()) return
+  routing.value = true
+  error.value = null
+  try {
+    routeResult.value = await previewSkillRoute(routeQuery.value.trim())
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    routing.value = false
+  }
+}
+
+const runRoutingEval = async () => {
+  evaluating.value = true
+  error.value = null
+  try {
+    evalResult.value = await evaluateSkillRouting()
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    evaluating.value = false
+  }
+}
 
 const filePath = computed(() => {
   const d = result.value?.data
@@ -254,6 +326,22 @@ onMounted(refresh)
   gap: var(--space-4);
 }
 
+.routing-panel {
+  margin-bottom: var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.routing-title { font-weight: 700; margin-bottom: var(--space-1); }
+.routing-actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); flex-wrap: wrap; }
+.routing-input { flex: 1; min-width: 280px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); }
+.eval-btn { border: 1px solid var(--color-primary); color: var(--color-primary); background: transparent; border-radius: var(--radius-sm); padding: var(--space-2) var(--space-4); cursor: pointer; }
+.route-result, .eval-result { margin-top: var(--space-3); padding: var(--space-3); background: var(--color-surface-alt); border-radius: var(--radius-sm); font-size: 0.82rem; }
+.candidate-row { display: grid; grid-template-columns: minmax(160px, 1fr) 90px 2fr; gap: var(--space-2); margin-top: var(--space-2); color: var(--color-text-muted); }
+.candidate-row.selected { color: var(--color-primary); font-weight: 600; }
+
 .sk-tags {
   display: flex;
   flex-wrap: wrap;
@@ -274,6 +362,82 @@ onMounted(refresh)
   margin-top: var(--space-4);
   border-top: 1px solid var(--color-border);
   padding-top: var(--space-4);
+}
+
+.sk-internals {
+  margin-bottom: var(--space-4);
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+}
+
+.internals-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: var(--space-2);
+}
+
+.step-list {
+  margin: 0 0 var(--space-2);
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.step-item {
+  font-size: 0.8rem;
+  color: var(--color-text);
+}
+
+.step-name {
+  font-weight: 600;
+}
+
+.step-uses {
+  margin-left: 6px;
+  font-size: 0.72rem;
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  font-family: var(--font-mono);
+}
+
+.step-uses.none {
+  color: var(--color-text-subtle);
+  background: var(--color-surface);
+  font-family: inherit;
+}
+
+.step-desc {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.74rem;
+  color: var(--color-text-muted);
+}
+
+.manual > summary {
+  cursor: pointer;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.manual-body {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.74rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow: auto;
 }
 
 .examples {

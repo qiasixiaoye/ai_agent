@@ -1,328 +1,422 @@
 <template>
-  <main class="home-page">
+  <main class="console">
+    <div class="scanline"></div>
+
+    <!-- HERO -->
     <header class="hero">
-      <div>
-        <p class="eyebrow">AI Agent Platform</p>
-        <h1>智能体研发控制台</h1>
-        <p class="subtitle">多轮对话 + RAG 检索 · Function Calling 工具调用 · 多步骤任务编排 · 自然语言驱动 Workflow Builder</p>
-      </div>
-      <div class="runtime-panel">
-        <span :class="['status-dot', summaryLoading ? 'pending' : backendOk ? 'ok' : 'fail']"></span>
-        <div>
-          <strong>{{ summaryLoading ? '检查中' : backendOk ? '后端可用' : '后端异常' }}</strong>
-          <span>{{ apiBase }}</span>
+      <div class="hero-left">
+        <p class="eyebrow">// AI&nbsp;AGENT&nbsp;CONTROL&nbsp;CONSOLE</p>
+        <h1 class="hero-title">智能体研发<span class="accent">控制台</span></h1>
+        <p class="hero-sub">
+          用 Agent（多轮 + RAG + 工具）· 配能力（知识库 / Skills / 编排）· 产工作流（一句话 → Dify 画布）
+        </p>
+
+        <div class="stat-row">
+          <div class="stat">
+            <span class="stat-num">{{ summary.tools }}</span>
+            <span class="stat-label">TOOLS</span>
+          </div>
+          <div class="stat-sep"></div>
+          <div class="stat">
+            <span class="stat-num">{{ summary.skills }}</span>
+            <span class="stat-label">SKILLS</span>
+          </div>
+          <div class="stat-sep"></div>
+          <div class="stat">
+            <span class="stat-num">{{ summary.documents }}</span>
+            <span class="stat-label">DOCS</span>
+          </div>
         </div>
+      </div>
+
+      <div class="hud-panel" :class="{ ok: backendOk, fail: !backendOk && !summaryLoading }">
+        <div class="hud-ring"></div>
+        <div class="hud-status">
+          <span :class="['hud-dot', summaryLoading ? 'pending' : backendOk ? 'ok' : 'fail']"></span>
+          <strong>{{ summaryLoading ? 'SCANNING' : backendOk ? 'ONLINE' : 'OFFLINE' }}</strong>
+        </div>
+        <code class="hud-url">{{ apiBase }}</code>
       </div>
     </header>
 
-    <section class="primary-grid">
-      <router-link to="/assistant-app" class="primary-card">
-        <span class="primary-icon">💬</span>
-        <h2>对话助手</h2>
-        <p>多轮对话 + RAG 知识检索，支持流式输出与上下文记忆。</p>
-        <span class="primary-cta">进入对话 →</span>
-      </router-link>
+    <!-- LAYERS -->
+    <section v-for="group in groups" :key="group.title" class="layer">
+      <div class="layer-head">
+        <span class="layer-no">{{ group.no }}</span>
+        <div>
+          <h3 class="layer-title">{{ group.title }}</h3>
+          <p class="layer-desc">{{ group.desc }}</p>
+        </div>
+        <span class="layer-line"></span>
+      </div>
 
-      <router-link to="/agent-platform" class="primary-card featured">
-        <span class="primary-icon">🛠</span>
-        <h2>Agent 工作台</h2>
-        <p>工具调用 + Skills + 多步骤任务编排，内置「银河摄影规划」一键演示。</p>
-        <span class="primary-cta">进入工作台 →</span>
-        <span class="primary-badge">推荐演示</span>
-      </router-link>
-
-      <router-link to="/workflow" class="primary-card">
-        <span class="primary-icon">🧬</span>
-        <h2>Workflow Builder</h2>
-        <p>自然语言 → Workflow IR → 执行 / 评测 / 导出 Dify DSL。</p>
-        <span class="primary-cta">进入构建器 →</span>
-      </router-link>
-    </section>
-
-    <section class="secondary-section">
-      <h3 class="secondary-title">能力总览</h3>
-      <div class="secondary-grid">
-        <AppCard
-          v-for="item in secondaryItems"
+      <div class="layer-grid">
+        <component
+          :is="item.external ? 'a' : 'button'"
+          v-for="item in group.items"
           :key="item.path"
-          clickable
-          :title="item.title"
-          :subtitle="item.description"
-          @click="$router.push(item.path)"
+          class="card"
+          :class="{ featured: item.featured }"
+          :href="item.external ? item.path : null"
+          :target="item.external ? '_blank' : null"
+          :rel="item.external ? 'noopener' : null"
+          @click="item.external ? null : $router.push(item.path)"
         >
-          <template #actions>
-            <TagChip :label="item.state" accent />
-          </template>
-        </AppCard>
+          <span class="corner tl"></span>
+          <span class="corner br"></span>
+          <div class="card-head">
+            <h4>{{ item.title }}</h4>
+            <span class="card-state">{{ item.state }}</span>
+          </div>
+          <p class="card-desc">{{ item.description }}</p>
+          <span class="card-go">{{ item.external ? 'OPEN ↗' : 'ENTER →' }}</span>
+        </component>
       </div>
     </section>
+
+    <footer class="console-foot">
+      <span>VS · AI AGENT PLATFORM</span>
+      <span>Spring AI · RAG · MCP · Dify</span>
+    </footer>
   </main>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useHead } from '@vueuse/head'
-import AppCard from '../components/ui/AppCard.vue'
-import TagChip from '../components/ui/TagChip.vue'
-import {
-  difyHealth,
-  listEvalSuites,
-  listKbDocuments,
-  listPlatformTools,
-  listSkills,
-  listWorkflows
-} from '../services/api'
+import { listKbDocuments, listPlatformTools, listSkills } from '../services/api'
 
 useHead({
-  title: 'AI Agent Platform - 智能体研发控制台',
+  title: 'AI Agent Platform · 智能体研发控制台',
   meta: [
-    {
-      name: 'description',
-      content: '智能体研发控制台：对话助手、Agent 工作台（工具调用/Skills/编排）、Workflow Builder。'
-    }
+    { name: 'description', content: '科幻控制台风格的 AI Agent 平台：对话/工具/知识库/一句话生成 Dify 工作流。' }
   ]
 })
 
 const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081/api'
+const difyConsoleUrl = import.meta.env.VITE_DIFY_CONSOLE_URL || 'http://localhost:3001'
 const summaryLoading = ref(true)
-const summary = ref({
-  workflows: '-',
-  skills: '-',
-  tools: '-',
-  documents: '-',
-  evalSuites: '-',
-  dify: '未配置'
-})
+const summary = ref({ skills: '–', tools: '–', documents: '–' })
 
 const backendOk = computed(() =>
-  [summary.value.workflows, summary.value.skills, summary.value.tools, summary.value.evalSuites]
-    .some((value) => value !== '-')
+  [summary.value.skills, summary.value.tools].some((v) => v !== '–')
 )
 
-const secondaryItems = computed(() => [
-  { title: '知识库管理', description: '上传、解析、切块、向量化与索引重建。', path: '/knowledge-base', state: `${summary.value.documents} 文档` },
-  { title: 'Skills 目录', description: '查看技能 Schema 并直接执行。', path: '/skills', state: `${summary.value.skills} skills` },
-  { title: 'Eval 评测', description: '运行 YAML 评测集，Keyword / LLM Judge。', path: '/eval', state: `${summary.value.evalSuites} suites` },
-  { title: 'Observability', description: '查看请求链路：检索/工具/模型各阶段耗时。', path: '/observability', state: '链路追踪' },
-  { title: 'Dify Bridge', description: '调用外部 Dify Workflow，导出 Skill OpenAPI。', path: '/dify', state: summary.value.dify },
-  { title: 'Manus 智能体', description: '多步推理与工具自动选择的执行台。', path: '/manus-app', state: 'agent' }
+const groups = computed(() => [
+  {
+    no: '01',
+    title: '用 Agent',
+    desc: '一个对话入口，三种模式：普通 / RAG 知识问答 / 智能体(Manus)。',
+    items: [
+      { title: 'AI 对话', description: '普通对话 · RAG 知识检索 · Manus 智能体（多步推理 + 工具调用），页内一键切换。', path: '/assistant-app', state: '3 MODES', featured: true }
+    ]
+  },
+  {
+    no: '02',
+    title: '配能力',
+    desc: '为智能体配置可调用的能力与知识资产。',
+    items: [
+      { title: 'Agent 工作台', description: '工具调用 + 多步骤任务编排，内置「银河摄影规划」演示。', path: '/agent-platform', state: `${summary.value.tools} TOOLS`, featured: true },
+      { title: 'Skills 目录', description: '查看技能 Schema 并直接执行，导出 OpenAPI 给 Dify。', path: '/skills', state: `${summary.value.skills} SKILLS` },
+      { title: 'Agent Runtime', description: 'MCP 工具目录、策略与熔断；工作/摘要/语义/情景四层记忆和上下文预算。', path: '/runtime', state: 'MCP + MEMORY' },
+      { title: '知识库', description: '上传、解析、切块、向量化与索引重建（pgvector RAG）。', path: '/knowledge-base', state: `${summary.value.documents} DOCS` }
+    ]
+  },
+  {
+    no: '03',
+    title: '产工作流',
+    desc: '把一段需求固化成可复用、Dify 画布可见的工作流，并自环优化提示词。',
+    items: [
+      { title: '工作流生产 + 下游优化', description: '一句话 → 自动生成 Dify Workflow DSL（含 MCP/Skills 节点）→ 画布可运行；页内切到「下游」可抽成本地副本、自环优化提示词并回写 Dify 复核。', path: '/workflow-studio', state: 'NL → DIFY → OPT', featured: true },
+      { title: 'Dify 控制台', description: '在 Dify 画布查看 / 编辑 / 运行已生成的工作流（外部页面，新标签打开）。', path: difyConsoleUrl, state: 'CONSOLE ↗', external: true }
+    ]
+  },
+  {
+    no: '04',
+    title: '可观测 · 横切',
+    desc: '贯穿每一步：检索 / 工具 / 模型各阶段耗时与链路追踪。',
+    items: [
+      { title: 'Observability', description: '查看请求链路：检索/工具/模型各阶段耗时与成败。', path: '/observability', state: 'TRACE' }
+    ]
+  }
 ])
 
 onMounted(async () => {
-  const [workflows, skills, tools, documents, suites, dify] = await Promise.allSettled([
-    listWorkflows(),
+  const [skills, tools, documents] = await Promise.allSettled([
     listSkills(),
     listPlatformTools(),
-    listKbDocuments(20),
-    listEvalSuites(),
-    difyHealth()
+    listKbDocuments(20)
   ])
-
   summary.value = {
-    workflows: countValue(workflows),
     skills: countValue(skills),
     tools: countValue(tools),
-    documents: countValue(documents),
-    evalSuites: countValue(suites),
-    dify: dify.status === 'fulfilled' && dify.value?.configured ? '已配置' : '未配置'
+    documents: countValue(documents)
   }
   summaryLoading.value = false
 })
 
 const countValue = (settled) => {
-  if (settled.status !== 'fulfilled') return '-'
+  if (settled.status !== 'fulfilled') return '–'
   if (Array.isArray(settled.value)) return settled.value.length
-  return settled.value == null ? '-' : '1'
+  return settled.value == null ? '–' : '1'
 }
 </script>
 
 <style scoped>
-.home-page {
+.console {
+  position: relative;
   min-height: 100vh;
-  background: var(--color-bg);
-  padding: var(--space-8);
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: var(--space-10) var(--space-8) var(--space-8);
 }
 
+/* moving scan line across the whole console */
+.scanline {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent, rgba(34, 211, 238, 0.05), transparent);
+  height: 180px;
+  opacity: 0.6;
+  animation: scan 7s linear infinite;
+  z-index: 0;
+}
+@keyframes scan {
+  0% { transform: translateY(-200px); }
+  100% { transform: translateY(100vh); }
+}
+
+.hero,
+.layer,
+.console-foot { position: relative; z-index: 1; }
+
+/* ---------- HERO ---------- */
 .hero {
-  max-width: 1240px;
-  margin: 0 auto var(--space-8);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-6);
+  gap: var(--space-8);
   flex-wrap: wrap;
+  margin-bottom: var(--space-10);
 }
 
 .eyebrow {
-  margin: 0 0 var(--space-2);
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.22em;
   color: var(--color-primary);
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  text-shadow: 0 0 14px rgba(34, 211, 238, 0.45);
 }
 
-h1 {
+.hero-title {
   margin: 0;
-  font-size: 2.25rem;
-  line-height: 1.15;
-  color: var(--color-text);
+  font-size: clamp(2.1rem, 5vw, 3.4rem);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  line-height: 1.05;
+  color: #f2f6fb;
+  text-shadow: 0 0 38px rgba(120, 180, 255, 0.18);
+}
+.hero-title .accent {
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 18px rgba(34, 211, 238, 0.35));
 }
 
-.subtitle {
-  margin: var(--space-3) 0 0;
-  font-size: 1rem;
+.hero-sub {
+  margin: var(--space-4) 0 0;
+  max-width: 560px;
   color: var(--color-text-muted);
-  max-width: 640px;
+  font-size: 0.98rem;
+  line-height: 1.7;
 }
 
-.runtime-panel {
-  min-width: 248px;
+.stat-row {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-4);
-  box-shadow: var(--shadow-sm);
+  gap: var(--space-5);
+  margin-top: var(--space-6);
 }
-
-.runtime-panel strong,
-.runtime-panel span:last-child {
-  display: block;
+.stat { display: flex; flex-direction: column; }
+.stat-num {
+  font-family: var(--font-mono);
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  text-shadow: 0 0 18px rgba(34, 211, 238, 0.35);
+  line-height: 1;
 }
-
-.runtime-panel span:last-child {
+.stat-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
   color: var(--color-text-subtle);
-  font-size: 0.75rem;
-  margin-top: 3px;
+  margin-top: 6px;
+}
+.stat-sep { width: 1px; height: 30px; background: var(--color-border-strong); }
+
+/* HUD status panel */
+.hud-panel {
+  position: relative;
+  min-width: 230px;
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--gradient-surface);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+.hud-panel.ok { box-shadow: var(--shadow-md), var(--glow-cyan); }
+.hud-ring {
+  position: absolute;
+  top: -40px; right: -40px;
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  border: 1px dashed rgba(34, 211, 238, 0.35);
+  animation: spin 14s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.hud-status { display: flex; align-items: center; gap: 10px; }
+.hud-status strong {
+  font-family: var(--font-mono);
+  letter-spacing: 0.18em;
+  font-size: 0.95rem;
+  color: var(--color-text);
+}
+.hud-dot {
+  width: 11px; height: 11px; border-radius: 50%;
+  background: var(--color-skipped);
+}
+.hud-dot.ok { background: var(--color-success); box-shadow: 0 0 12px var(--color-success); animation: pulse 1.8s ease-in-out infinite; }
+.hud-dot.fail { background: var(--color-error); box-shadow: 0 0 12px var(--color-error); }
+.hud-dot.pending { background: var(--color-warning); box-shadow: 0 0 12px var(--color-warning); }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+.hud-url {
+  display: block;
+  margin-top: var(--space-3);
+  font-size: 11px;
+  color: var(--color-text-subtle);
   word-break: break-all;
 }
 
-.status-dot {
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  flex: 0 0 auto;
-  background: var(--color-skipped);
-}
-
-.status-dot.ok { background: var(--color-success); }
-.status-dot.fail { background: var(--color-error); }
-.status-dot.pending { background: var(--color-warning); }
-
-.primary-grid {
-  max-width: 1240px;
-  margin: 0 auto var(--space-8);
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-5);
-}
-
-.primary-card {
-  position: relative;
+/* ---------- LAYERS ---------- */
+.layer { margin-bottom: var(--space-8); }
+.layer-head {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-6);
-  text-decoration: none;
-  color: var(--color-text);
-  box-shadow: var(--shadow-sm);
-  transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
 }
-
-.primary-card:hover {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-3px);
-  border-color: var(--color-primary-soft);
-}
-
-.primary-card.featured {
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
-  color: #fff;
-  border-color: transparent;
-}
-
-.primary-card.featured p,
-.primary-card.featured .primary-cta {
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.primary-icon {
-  font-size: 2rem;
-}
-
-.primary-card h2 {
-  margin: 0;
-  font-size: 1.25rem;
-}
-
-.primary-card p {
-  margin: 0;
-  font-size: 0.9rem;
-  color: var(--color-text-muted);
-  line-height: 1.6;
-  flex: 1;
-}
-
-.primary-cta {
-  font-size: 0.85rem;
+.layer-no {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
   font-weight: 700;
   color: var(--color-primary);
+  width: 42px; height: 42px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--color-primary-soft);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-light);
+  box-shadow: inset 0 0 16px rgba(34, 211, 238, 0.12);
 }
+.layer-title { margin: 0; font-size: 1.12rem; font-weight: 700; color: var(--color-text); letter-spacing: 0.01em; }
+.layer-desc { margin: 3px 0 0; font-size: 0.84rem; color: var(--color-text-muted); }
+.layer-line { flex: 1; height: 1px; background: linear-gradient(90deg, var(--color-border-strong), transparent); }
 
-.primary-badge {
-  position: absolute;
-  top: var(--space-4);
-  right: var(--space-4);
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  border-radius: var(--radius-pill);
-  padding: 2px 10px;
-  font-size: 0.72rem;
-  font-weight: 600;
-}
-
-.secondary-section {
-  max-width: 1240px;
-  margin: 0 auto;
-}
-
-.secondary-title {
-  margin: 0 0 var(--space-4);
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--color-text-muted);
-}
-
-.secondary-grid {
+.layer-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: var(--space-4);
 }
 
-@media (max-width: 920px) {
-  .primary-grid {
-    grid-template-columns: 1fr;
-  }
+/* ---------- CARD ---------- */
+.card {
+  position: relative;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  min-height: 150px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  backdrop-filter: blur(6px);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  overflow: hidden;
+}
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--gradient-brand);
+  opacity: 0.5;
+  transition: opacity 0.18s ease;
+}
+.card:hover {
+  transform: translateY(-4px);
+  border-color: var(--color-primary-soft);
+  box-shadow: var(--shadow-lg), var(--glow-cyan);
+}
+.card:hover::before { opacity: 1; }
+.card.featured { background: linear-gradient(160deg, rgba(34, 211, 238, 0.10), rgba(99, 102, 241, 0.08)); }
+
+.corner {
+  position: absolute;
+  width: 12px; height: 12px;
+  border: 1px solid var(--color-primary-soft);
+  opacity: 0.5;
+}
+.corner.tl { top: 8px; left: 8px; border-right: 0; border-bottom: 0; }
+.corner.br { bottom: 8px; right: 8px; border-left: 0; border-top: 0; }
+
+.card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
+.card-head h4 { margin: 0; font-size: 1.08rem; font-weight: 700; }
+.card-state {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--color-primary);
+  padding: 3px 8px;
+  border: 1px solid var(--color-primary-soft);
+  border-radius: var(--radius-pill);
+  background: var(--color-primary-light);
+}
+.card-desc { margin: 0; flex: 1; font-size: 0.86rem; line-height: 1.6; color: var(--color-text-muted); }
+.card-go {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--color-primary);
 }
 
-@media (max-width: 680px) {
-  .home-page {
-    padding: var(--space-4);
-  }
+/* ---------- FOOT ---------- */
+.console-foot {
+  margin-top: var(--space-10);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--color-text-subtle);
+}
 
-  .hero {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  h1 {
-    font-size: 1.75rem;
-  }
+@media (max-width: 720px) {
+  .console { padding: var(--space-6) var(--space-4); }
+  .hud-panel { width: 100%; }
 }
 </style>

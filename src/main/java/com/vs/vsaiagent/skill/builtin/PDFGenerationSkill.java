@@ -38,7 +38,7 @@ public class PDFGenerationSkill extends AbstractSkill {
                 .displayName("PDF 生成")
                 .description("Generate a PDF file with given content")
                 .version("1.0.0")
-                .tags(List.of("file", "document"))
+                .tags(List.of("file", "document", "PDF", "文档", "导出"))
                 .inputs(List.of(
                         SkillParam.required("fileName", "string", "Name of the file to save the generated PDF"),
                         SkillParam.required("content",  "string", "Content to be included in the PDF")

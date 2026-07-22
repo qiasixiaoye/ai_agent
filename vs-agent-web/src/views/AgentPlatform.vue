@@ -154,6 +154,7 @@
           />
         </div>
       </div>
+
     </main>
   </div>
 </template>
@@ -172,6 +173,9 @@ import {
   executePlatformTask,
   runAstroDemo
 } from '../services/api'
+
+// 命名以便 <keep-alive include> 缓存本页（跳去审计轨迹再返回时不丢失运行结果）
+defineOptions({ name: 'AgentPlatform' })
 
 // ---------------- Astro demo ----------------
 
@@ -571,5 +575,46 @@ onMounted(refreshTools)
   font-family: var(--font-mono);
   font-size: 0.8rem;
   resize: vertical;
+}
+
+.workflow-builder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.wb-form {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.wb-textarea,
+.wb-input {
+  flex: 1;
+  box-sizing: border-box;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+  font-family: inherit;
+}
+
+.wb-textarea {
+  resize: vertical;
+}
+
+.link-btn {
+  display: inline-flex;
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-5);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  cursor: pointer;
 }
 </style>

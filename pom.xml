@@ -139,6 +139,12 @@
             <artifactId>spring-ai-mcp-client-spring-boot-starter</artifactId>
             <version>1.0.0-M6</version>
         </dependency>
+        <!-- Spring AI MCP Server：把已注册的工具/技能暴露为 MCP tools，供 Dify 等动态拉取 -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-mcp-server-webmvc-spring-boot-starter</artifactId>
+            <version>1.0.0-M6</version>
+        </dependency>
         <!-- PDF 生成库 -->
         <!-- https://mvnrepository.com/artifact/com.itextpdf/itext-core -->
         <dependency>

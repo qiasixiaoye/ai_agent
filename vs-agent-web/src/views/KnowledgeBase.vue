@@ -203,8 +203,8 @@ onMounted(refresh)
 <style scoped>
 .kb-page {
   min-height: 100vh;
-  background: #f6f8fb;
-  color: #172033;
+  background: transparent;
+  color: var(--color-text);
   padding: 24px;
 }
 
@@ -221,7 +221,7 @@ onMounted(refresh)
   gap: 18px;
   align-items: start;
   padding-bottom: 18px;
-  border-bottom: 1px solid #dbe3ef;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .back-link {
@@ -246,7 +246,7 @@ h1 {
 .page-header p,
 .panel-head p {
   margin: 8px 0 0;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .header-actions {
@@ -257,23 +257,23 @@ h1 {
 button,
 .file-button {
   min-height: 34px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--color-border);
   border-radius: 7px;
-  background: #ffffff;
-  color: #172033;
+  background: var(--color-surface);
+  color: var(--color-text);
   padding: 0 12px;
   cursor: pointer;
 }
 
 .ghost-btn:hover,
 .doc-actions button:hover {
-  background: #f1f5f9;
+  background: var(--color-surface-alt);
 }
 
 .warn-btn {
-  background: #1f7a4d;
-  border-color: #1f7a4d;
-  color: #ffffff;
+  background: var(--color-success);
+  border-color: var(--color-success);
+  color: var(--color-surface);
 }
 
 button:disabled {
@@ -291,8 +291,8 @@ button:disabled {
 .summary-card,
 .upload-panel,
 .table-panel {
-  background: #ffffff;
-  border: 1px solid #dbe3ef;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   box-shadow: 0 8px 26px rgba(31, 45, 61, 0.05);
 }
@@ -303,7 +303,7 @@ button:disabled {
 
 .summary-card span {
   display: block;
-  color: #64748b;
+  color: var(--color-text-muted);
   font-size: 12px;
 }
 
@@ -326,7 +326,7 @@ button:disabled {
 }
 
 .panel-title {
-  color: #172033;
+  color: var(--color-text);
   font-weight: 800;
   font-size: 17px;
 }
@@ -338,34 +338,34 @@ button:disabled {
   gap: 7px;
   border: 1px dashed #94a3b8;
   border-radius: 8px;
-  background: #f8fafc;
+  background: var(--color-surface-alt);
   margin: 14px 0;
   text-align: center;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .drop-zone.active {
-  border-color: #15803d;
-  background: #ecfdf3;
+  border-color: var(--color-success);
+  background: var(--color-success-bg);
 }
 
 .drop-zone strong {
-  color: #172033;
+  color: var(--color-text);
 }
 
 .file-button {
   display: inline-flex;
   align-items: center;
-  background: #15803d;
-  border-color: #15803d;
-  color: #ffffff;
+  background: var(--color-success);
+  border-color: var(--color-success);
+  color: var(--color-surface);
   font-weight: 700;
 }
 
 label {
   display: block;
   margin: 10px 0 5px;
-  color: #475569;
+  color: var(--color-text-muted);
   font-size: 12px;
   font-weight: 700;
 }
@@ -373,19 +373,19 @@ label {
 input {
   width: 100%;
   min-height: 36px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--color-border);
   border-radius: 7px;
   padding: 0 10px;
 }
 
 .notice {
   margin-top: 12px;
-  color: #475569;
+  color: var(--color-text-muted);
   font-size: 13px;
 }
 
 .notice.ok {
-  color: #15803d;
+  color: var(--color-success);
 }
 
 .notice.fail,
@@ -398,11 +398,11 @@ input {
   justify-content: space-between;
   gap: 12px;
   padding-bottom: 14px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .empty-state {
-  color: #64748b;
+  color: var(--color-text-muted);
   text-align: center;
   padding: 72px 0;
 }
@@ -418,8 +418,8 @@ input {
   grid-template-columns: minmax(220px, 1fr) auto auto;
   gap: 14px;
   align-items: center;
-  border: 1px solid #e2e8f0;
-  border-left: 4px solid #15803d;
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-success);
   border-radius: 8px;
   padding: 13px;
 }
@@ -431,7 +431,7 @@ input {
 
 .doc-main span {
   margin-top: 4px;
-  color: #64748b;
+  color: var(--color-text-muted);
   font-size: 13px;
 }
 
@@ -439,7 +439,7 @@ input {
   display: flex;
   gap: 8px;
   align-items: center;
-  color: #64748b;
+  color: var(--color-text-muted);
   font-size: 12px;
 }
 
@@ -449,23 +449,23 @@ input {
   min-height: 24px;
   border-radius: 6px;
   padding: 0 8px;
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
   font-weight: 700;
 }
 
 .status-badge.ok {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--color-success-bg);
+  color: var(--color-success);
 }
 
 .status-badge.pending {
-  background: #fef3c7;
+  background: var(--color-warning-bg);
   color: #92400e;
 }
 
 .status-badge.fail {
-  background: #fee2e2;
+  background: var(--color-error-bg);
   color: #991b1b;
 }
 
@@ -476,7 +476,7 @@ input {
 
 .doc-actions .danger {
   color: #b91c1c;
-  border-color: #fecaca;
+  border-color: var(--color-error);
 }
 
 .row-error {

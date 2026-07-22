@@ -111,7 +111,8 @@ public class WorkflowDslValidateService {
         if (!types.contains(WorkflowNode.TYPE_START)) {
             errors.add("缺少 start 节点");
         }
-        if (!types.contains(WorkflowNode.TYPE_ANSWER)) {
+        // 收尾节点：chatflow(advanced-chat) 用 answer，workflow 用 end，二者其一即可
+        if (!types.contains(WorkflowNode.TYPE_ANSWER) && !types.contains("end")) {
             errors.add("缺少 answer 节点");
         }
 

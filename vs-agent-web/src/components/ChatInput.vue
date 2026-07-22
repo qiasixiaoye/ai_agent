@@ -44,9 +44,10 @@ const onSubmit = () => {
 <style scoped>
 .chat-input-container {
   display: flex;
-  padding: 10px;
-  background-color: #fff;
-  border-top: 1px solid #e0e0e0;
+  padding: 12px;
+  background: rgba(12, 18, 34, 0.65);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid var(--color-border);
   position: sticky;
   bottom: 0;
 }
@@ -54,33 +55,40 @@ const onSubmit = () => {
 .chat-input {
   flex: 1;
   height: 44px;
-  padding: 12px;
-  border: 1px solid #e0e0e0;
+  padding: 12px 16px;
+  border: 1px solid var(--color-border);
   border-radius: 22px;
   outline: none;
   resize: none;
   font-family: inherit;
-  font-size: 16px;
+  font-size: 15px;
+  background: var(--color-surface);
+  color: var(--color-text);
 }
+.chat-input::placeholder { color: var(--color-text-subtle); }
+.chat-input:focus { border-color: var(--color-primary-soft); box-shadow: var(--glow-cyan); }
 
 .send-button {
   margin-left: 10px;
-  padding: 0 20px;
+  padding: 0 22px;
   height: 44px;
-  background-color: #4CAF50;
-  color: white;
+  background: var(--gradient-brand);
+  color: #04121a;
   border: none;
   border-radius: 22px;
   cursor: pointer;
-  font-weight: bold;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .send-button:hover {
-  background-color: #45a049;
+  filter: brightness(1.1);
+  box-shadow: var(--glow-cyan);
 }
 
 .send-button:disabled {
-  background-color: #cccccc;
+  background: var(--color-surface-alt);
+  color: var(--color-text-subtle);
   cursor: not-allowed;
 }
 

@@ -19,7 +19,11 @@ public record SkillMetadata(
         List<SkillParam> outputs,
         List<String> examples,
         Long timeoutMs,
-        SkillSourceType sourceType
+        SkillSourceType sourceType,
+        /** SKILL.md 正文（front-matter 之后的 markdown），即技能的「操作手册」。这是 Skill 区别于裸工具的内部知识。 */
+        String instructions,
+        /** 技能的有序内部步骤；步骤可引用(调用)其它工具/技能，体现 Skill 是「过程」而非单点函数。 */
+        List<SkillStep> steps
 ) {
 
     /** 紧凑构造器：把可空集合归一化为空 List，避免下游写 null 检查 */
@@ -28,6 +32,10 @@ public record SkillMetadata(
         inputs = inputs == null ? Collections.emptyList() : List.copyOf(inputs);
         outputs = outputs == null ? Collections.emptyList() : List.copyOf(outputs);
         examples = examples == null ? Collections.emptyList() : List.copyOf(examples);
+        steps = steps == null ? Collections.emptyList() : List.copyOf(steps);
+        if (instructions == null) {
+            instructions = "";
+        }
         if (sourceType == null) {
             sourceType = SkillSourceType.LOCAL;
         }
@@ -51,6 +59,8 @@ public record SkillMetadata(
         private List<String> examples;
         private Long timeoutMs;
         private SkillSourceType sourceType;
+        private String instructions;
+        private List<SkillStep> steps;
 
         public Builder name(String v) { this.name = v; return this; }
         public Builder displayName(String v) { this.displayName = v; return this; }
@@ -62,10 +72,12 @@ public record SkillMetadata(
         public Builder examples(List<String> v) { this.examples = v; return this; }
         public Builder timeoutMs(Long v) { this.timeoutMs = v; return this; }
         public Builder sourceType(SkillSourceType v) { this.sourceType = v; return this; }
+        public Builder instructions(String v) { this.instructions = v; return this; }
+        public Builder steps(List<SkillStep> v) { this.steps = v; return this; }
 
         public SkillMetadata build() {
             return new SkillMetadata(name, displayName, description, version,
-                    tags, inputs, outputs, examples, timeoutMs, sourceType);
+                    tags, inputs, outputs, examples, timeoutMs, sourceType, instructions, steps);
         }
     }
 }

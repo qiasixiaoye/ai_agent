@@ -15,15 +15,28 @@ public final class DifyWorkflowTemplate {
     private DifyWorkflowTemplate() {
     }
 
+    /** 兼容旧调用：默认 workflow（单轮）形态。 */
     public static Map<String, Object> root(String name, String description,
                                            List<Map<String, Object>> nodes,
                                            List<Map<String, Object>> edges) {
+        return root(name, description, nodes, edges, false);
+    }
+
+    /**
+     * @param chatflow true → advanced-chat（Chatflow，多轮对话，answer 收尾）；
+     *                 false → workflow（单轮，end 收尾）。
+     *                 这是 Dify 图编排仅有的两种 app.mode；agent 是节点类型，不是 app.mode。
+     */
+    public static Map<String, Object> root(String name, String description,
+                                           List<Map<String, Object>> nodes,
+                                           List<Map<String, Object>> edges,
+                                           boolean chatflow) {
         Map<String, Object> app = new LinkedHashMap<>();
         app.put("name", name == null ? "untitled" : name);
         app.put("description", description == null ? "" : description);
         app.put("icon", "🤖");
         app.put("icon_background", "#FFEAD5");
-        app.put("mode", "workflow");
+        app.put("mode", chatflow ? "advanced-chat" : "workflow");
         app.put("use_icon_as_answer_icon", false);
 
         Map<String, Object> graph = new LinkedHashMap<>();
