@@ -23,7 +23,7 @@
         </template>
       </WorkbenchSection>
     </div>
-    <WorkbenchSection v-if="generatedRun || observation" title="Run results" class="panel result-panel">
+    <WorkbenchSection v-if="generatedRun || observation || importResult?.appId" title="Run results" class="panel result-panel">
       <div v-if="generatedRun"><h3>Generated workflow run</h3><pre>{{ pretty(generatedRun) }}</pre></div>
       <div v-if="importResult?.appId"><h3>Dify run observation</h3><button type="button" :disabled="observing" @click="observeRun">{{ observing ? 'Observing...' : 'Run and observe in Dify' }}</button><pre v-if="observation">{{ pretty(observation) }}</pre></div>
     </WorkbenchSection>
@@ -38,6 +38,7 @@ import { exportWorkflowDslUrl, generateWorkflowFromRequirement, importGeneratedW
 const requirement = ref('')
 const mode = ref('http')
 const appKind = ref('chatflow')
+const generatedAppKind = ref(null)
 const generated = ref(null)
 const generatedRun = ref(null)
 const importResult = ref(null)
@@ -52,10 +53,10 @@ const exportUrl = computed(() => generated.value?.workflowId ? exportWorkflowDsl
 const difyAppUrl = computed(() => importResult.value?.appId ? `${import.meta.env.VITE_DIFY_CONSOLE_URL || 'http://localhost:3001'}/app/${importResult.value.appId}/workflow` : '')
 const pretty = (value) => JSON.stringify(value, null, 2)
 const capture = async (operation, fallback) => { error.value = ''; try { return await operation() } catch (cause) { error.value = cause?.message || fallback; return null } }
-const generate = async () => { generating.value = true; generated.value = null; generatedRun.value = null; importResult.value = null; observation.value = null; try { generated.value = await capture(() => generateWorkflowFromRequirement(requirement.value.trim(), mode.value, appKind.value), 'Workflow generation failed.') } finally { generating.value = false } }
+const generate = async () => { generating.value = true; generated.value = null; generatedAppKind.value = null; generatedRun.value = null; importResult.value = null; observation.value = null; try { const result = await capture(() => generateWorkflowFromRequirement(requirement.value.trim(), mode.value, appKind.value), 'Workflow generation failed.'); generated.value = result; if (result) generatedAppKind.value = appKind.value } finally { generating.value = false } }
 const runGenerated = async () => { runningGenerated.value = true; try { generatedRun.value = await capture(() => runGeneratedWorkflow(generated.value.ir, requirement.value.trim()), 'Generated workflow run failed.') } finally { runningGenerated.value = false } }
 const importToDify = async () => { importing.value = true; observation.value = null; try { importResult.value = await capture(() => importGeneratedWorkflowToDify(generated.value.workflowId), 'Dify import failed.') } finally { importing.value = false } }
-const observeRun = async () => { observing.value = true; try { observation.value = await capture(() => runImportedDifyApp(importResult.value.appId, appKind.value, requirement.value.trim()), 'Dify run observation failed.') } finally { observing.value = false } }
+const observeRun = async () => { observing.value = true; try { observation.value = await capture(() => runImportedDifyApp(importResult.value.appId, generatedAppKind.value, requirement.value.trim()), 'Dify run observation failed.') } finally { observing.value = false } }
 </script>
 
 <style scoped>
