@@ -82,9 +82,9 @@ const scrollToBottom = async () => {
   if (messagesContainer.value) messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
 }
 
-const openConnection = (message) => {
-  if (mode.value === 'rag') return connectToAssistantAppRagChat(message, chatId.value)
-  if (mode.value === 'agent') {
+const openConnection = (message, requestMode) => {
+  if (requestMode === 'rag') return connectToAssistantAppRagChat(message, chatId.value)
+  if (requestMode === 'agent') {
     agentHistory.push({ user: message })
     return connectToManusChat(message, JSON.stringify(agentHistory))
   }
@@ -94,14 +94,15 @@ const openConnection = (message) => {
 const sendMessage = (message) => {
   if (loading.value) return
 
+  const requestMode = mode.value
   lastUserMessage.value = message
-  chatStore.addMessage(chatId.value, { content: message, isUser: true, mode: mode.value })
+  chatStore.addMessage(chatId.value, { content: message, isUser: true, mode: requestMode })
   loading.value = true
   scrollToBottom()
 
   try {
     eventSource.value?.close()
-    const source = openConnection(message)
+    const source = openConnection(message, requestMode)
     eventSource.value = source
     let aiResponse = ''
     let assistantMessageAdded = false
@@ -113,12 +114,12 @@ const sendMessage = (message) => {
       source.close()
       if (eventSource.value === source) eventSource.value = null
       chatStore.updateLastAssistantMessage(chatId.value, { status })
-      if (mode.value === 'agent' && aiResponse) agentHistory.push({ assistant: aiResponse })
+      if (requestMode === 'agent' && aiResponse) agentHistory.push({ assistant: aiResponse })
       memoryStore.suggestMemory({ userMessage: lastUserMessage.value, assistantMessage: aiResponse })
       workbench.addInvocation({
         source: 'chat',
         operation: 'assistant-response',
-        mode: mode.value,
+        mode: requestMode,
         status,
         summary: aiResponse ? aiResponse.slice(0, 160) : 'No assistant response received.'
       })
@@ -133,7 +134,7 @@ const sendMessage = (message) => {
         chatStore.addMessage(chatId.value, {
           content: aiResponse,
           isUser: false,
-          mode: mode.value,
+          mode: requestMode,
           status: 'streaming'
         })
         assistantMessageAdded = true
@@ -149,7 +150,7 @@ const sendMessage = (message) => {
         chatStore.addMessage(chatId.value, {
           content: 'Unable to connect to the assistant. Please check that the backend is running, then try again.',
           isUser: false,
-          mode: mode.value,
+          mode: requestMode,
           status: 'error',
           details: 'The assistant stream could not be opened or was interrupted.'
         })
@@ -161,14 +162,14 @@ const sendMessage = (message) => {
     chatStore.addMessage(chatId.value, {
       content: 'Unable to start the assistant. Please check that the backend is running, then try again.',
       isUser: false,
-      mode: mode.value,
+      mode: requestMode,
       status: 'error',
       details: 'The browser could not create an assistant stream.'
     })
     workbench.addInvocation({
       source: 'chat',
       operation: 'assistant-response',
-      mode: mode.value,
+      mode: requestMode,
       status: 'error',
       summary: 'Assistant stream could not be started.'
     })
