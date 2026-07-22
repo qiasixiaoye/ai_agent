@@ -18,7 +18,13 @@ export const useRuntimeStore = defineStore('runtime', {
     lastResult: null
   }),
   getters: {
-    status: (state) => state.health?.status || (state.error ? 'error' : 'unknown')
+    status: (state) => {
+      if (state.health?.status) return state.health.status
+      if (state.error) return 'error'
+      if (state.health?.providerAvailable === true) return 'healthy'
+      if (state.health?.providerAvailable === false) return 'down'
+      return 'unknown'
+    }
   },
   actions: {
     normalizeArgumentsJson(value) {
@@ -57,9 +63,13 @@ export const useRuntimeStore = defineStore('runtime', {
       }
     },
     riskForTool(tool) {
-      const risk = String(tool?.riskLevel || tool?.risk || '').toLowerCase()
-      if (risk.includes('high') || tool?.requiresConfirmation) return 'confirm'
-      if (risk.includes('block')) return 'blocked'
+      if (!tool) return 'unknown'
+      if (tool.enabled === false) return 'blocked'
+      const risk = String(tool.riskLevel || tool.risk || '').toLowerCase()
+      const policyText = `${risk} ${tool.reason || ''}`.toLowerCase()
+      if (/(deny|denied|block|blocked)/.test(policyText)) return 'blocked'
+      if (tool.confirmationRequired === true) return 'confirm'
+      if (risk.includes('high')) return 'confirm'
       if (risk.includes('safe') || risk.includes('low')) return 'safe'
       return 'unknown'
     },

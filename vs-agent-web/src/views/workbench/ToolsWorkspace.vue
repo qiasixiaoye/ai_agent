@@ -56,6 +56,9 @@ const filteredTools = computed(() => {
   return runtime.tools.filter((tool) => !query || `${toolLabel(tool)} ${tool.description || ''}`.toLowerCase().includes(query))
 })
 const pretty = (value) => JSON.stringify(value, null, 2)
+const invocationSummary = (result) => result?.success === false
+  ? result.errorMessage || result.message || 'Managed MCP invocation failed.'
+  : 'Managed MCP invocation completed.'
 
 const selectTool = (tool) => { selectedTool.value = tool; argumentsJson.value = '{}'; confirmed.value = false; jsonError.value = ''; localError.value = '' }
 const loadTools = async () => { await runtime.loadTools(); if (!selectedTool.value && runtime.tools.length) selectTool(runtime.tools[0]) }
@@ -65,7 +68,12 @@ const invoke = async (isConfirmed) => {
   try { normalized = runtime.normalizeArgumentsJson(argumentsJson.value) } catch { jsonError.value = 'Arguments must be valid JSON before the tool can run.'; return }
   try {
     const result = await runtime.invokeTool({ toolName: toolKey(selectedTool.value), argumentsJson: normalized, confirmed: isConfirmed })
-    workbench.addInvocation({ source: 'tools', name: toolLabel(selectedTool.value), status: 'complete', summary: 'Managed MCP invocation completed.' })
+    workbench.addInvocation({
+      source: 'tools',
+      name: toolLabel(selectedTool.value),
+      status: result?.success === false ? 'failed' : 'complete',
+      summary: invocationSummary(result)
+    })
     return result
   } catch { localError.value = runtime.error || 'Tool invocation failed.' }
 }

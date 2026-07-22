@@ -29,6 +29,9 @@ const toolLabel = (tool) => tool?.displayName || toolKey(tool) || 'Unnamed tool'
 const selectedTool = computed(() => runtime.tools.find((tool) => toolKey(tool) === selectedName.value) || null)
 const risk = computed(() => runtime.riskForTool(selectedTool.value))
 const pretty = (value) => JSON.stringify(value, null, 2)
+const invocationSummary = (result) => result?.success === false
+  ? result.errorMessage || result.message || 'Managed MCP invocation failed.'
+  : 'Managed runtime invocation completed.'
 const resetInvocation = () => { argumentsJson.value = '{}'; confirmed.value = false; jsonError.value = ''; localError.value = '' }
 const initializeSelection = () => { if (!runtime.tools.some((tool) => toolKey(tool) === selectedName.value)) selectedName.value = toolKey(runtime.tools[0]); resetInvocation() }
 const refresh = async () => { localError.value = ''; await Promise.all([runtime.loadHealth(), runtime.refreshTools()]); if (runtime.tools.length) initializeSelection() }
@@ -36,7 +39,15 @@ const invoke = async (isConfirmed) => {
   jsonError.value = ''; localError.value = ''
   let normalized
   try { normalized = runtime.normalizeArgumentsJson(argumentsJson.value) } catch { jsonError.value = 'Arguments must be valid JSON before the tool can run.'; return }
-  try { await runtime.invokeTool({ toolName: selectedName.value, argumentsJson: normalized, confirmed: isConfirmed }); workbench.addInvocation({ source: 'runtime', name: toolLabel(selectedTool.value), status: 'complete', summary: 'Managed runtime invocation completed.' }) } catch { localError.value = runtime.error || 'Managed tool invocation failed.' }
+  try {
+    const result = await runtime.invokeTool({ toolName: selectedName.value, argumentsJson: normalized, confirmed: isConfirmed })
+    workbench.addInvocation({
+      source: 'runtime',
+      name: toolLabel(selectedTool.value),
+      status: result?.success === false ? 'failed' : 'complete',
+      summary: invocationSummary(result)
+    })
+  } catch { localError.value = runtime.error || 'Managed tool invocation failed.' }
 }
 const confirmAndInvoke = async () => { confirmed.value = true; await invoke(true) }
 onMounted(async () => { await Promise.all([runtime.loadHealth(), runtime.loadTools()]); if (runtime.tools.length) initializeSelection() })
