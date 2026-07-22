@@ -51,6 +51,13 @@ export const useMemoryStore = defineStore('memory', {
         status: 'pending'
       }
     },
+    updateSuggestion({ content, importance }) {
+      this.suggestion = {
+        content: String(content ?? this.suggestion?.content ?? ''),
+        importance: Math.min(1, Math.max(0, Number(importance ?? this.suggestion?.importance ?? 0.8) || 0)),
+        status: 'pending'
+      }
+    },
     async writeSuggestion(conversationId) {
       if (!this.suggestion?.content) return
       this.writing = true

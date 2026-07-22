@@ -63,6 +63,7 @@ onMounted(() => {
   const existingChatId = workbench.currentConversationId
   if (existingChatId && chatStore.assistantAppChats[existingChatId]) {
     chatId.value = existingChatId
+    workbench.setConversation(chatId.value)
     return
   }
 
@@ -117,11 +118,10 @@ const sendMessage = (message) => {
       if (requestMode === 'agent' && aiResponse) agentHistory.push({ assistant: aiResponse })
       memoryStore.suggestMemory({ userMessage: lastUserMessage.value, assistantMessage: aiResponse })
       workbench.addInvocation({
-        source: 'chat',
-        operation: 'assistant-response',
-        mode: requestMode,
-        status,
-        summary: aiResponse ? aiResponse.slice(0, 160) : 'No assistant response received.'
+        source: mode.value,
+        name: 'chat',
+        status: aiResponse ? 'complete' : 'incomplete',
+        summary: lastUserMessage.value.slice(0, 120)
       })
       loading.value = false
       scrollToBottom()
