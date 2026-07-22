@@ -23,8 +23,8 @@
           <label for="tool-arguments">Arguments (JSON)</label>
           <textarea id="tool-arguments" v-model="argumentsJson" rows="11" spellcheck="false" />
           <p v-if="jsonError" class="status-error">{{ jsonError }}</p>
-          <button v-if="risk === 'safe'" type="button" :disabled="runtime.invoking || selectedTool.enabled === false" @click="invoke(false)">{{ runtime.invoking ? 'Invoking...' : 'Run tool' }}</button>
-          <button v-else-if="risk !== 'blocked'" type="button" :disabled="runtime.invoking || selectedTool.enabled === false" @click="confirmAndInvoke">{{ runtime.invoking ? 'Invoking...' : 'Confirm and run' }}</button>
+          <button v-if="risk === 'safe'" type="button" :disabled="runtime.invoking" @click="invoke(false)">{{ runtime.invoking ? 'Invoking...' : 'Run tool' }}</button>
+          <button v-else-if="risk !== 'blocked'" type="button" :disabled="runtime.invoking" @click="confirmAndInvoke">{{ runtime.invoking ? 'Invoking...' : 'Confirm and run' }}</button>
           <p v-else class="status-error">This tool is blocked by its runtime policy.</p>
           <pre v-if="runtime.lastResult">{{ pretty(runtime.lastResult) }}</pre>
         </template>
