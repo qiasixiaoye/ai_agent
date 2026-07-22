@@ -16,10 +16,13 @@ const requiredFiles = [
   'src/stores/skills.js',
   'src/stores/memory.js',
   'src/views/workbench/ChatWorkspace.vue',
+  'src/views/workbench/AgentWorkspace.vue',
   'src/views/workbench/ToolsWorkspace.vue',
   'src/views/workbench/SkillsWorkspace.vue',
+  'src/views/workbench/McpWorkspace.vue',
   'src/views/workbench/RuntimeWorkspace.vue',
   'src/views/workbench/MemoryWorkspace.vue',
+  'src/views/workbench/ContextWorkspace.vue',
   'src/views/workbench/WorkflowWorkspace.vue',
   'src/views/workbench/KnowledgeWorkspace.vue',
   'src/views/workbench/ObservabilityWorkspace.vue'
@@ -34,7 +37,7 @@ for (const file of requiredFiles) {
 const routerPath = resolve(root, 'src/router/index.js')
 if (existsSync(routerPath)) {
   const router = readFileSync(routerPath, 'utf8')
-  for (const path of ['/', '/tools', '/skills', '/runtime', '/memory', '/workflow-studio', '/knowledge-base', '/observability']) {
+  for (const path of ['/', '/agent', '/tools', '/skills', '/mcp', '/runtime', '/memory', '/context', '/workflow-studio', '/knowledge-base', '/observability']) {
     const childPath = path === '/' ? null : path.slice(1)
     const hasAbsolutePath = router.includes(`path: '${path}'`) || router.includes(`path: \"${path}\"`)
     const hasChildPath = childPath && (router.includes(`path: '${childPath}'`) || router.includes(`path: \"${childPath}\"`))

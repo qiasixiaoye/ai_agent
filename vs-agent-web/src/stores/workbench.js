@@ -2,10 +2,13 @@ import { defineStore } from 'pinia'
 
 export const WORKBENCH_AREAS = [
   { key: 'chat', path: '/', label: 'Chat' },
+  { key: 'agent', path: '/agent', label: 'Agent' },
   { key: 'tools', path: '/tools', label: 'Tools' },
   { key: 'skills', path: '/skills', label: 'Skills' },
+  { key: 'mcp', path: '/mcp', label: 'MCP' },
   { key: 'runtime', path: '/runtime', label: 'Runtime' },
   { key: 'memory', path: '/memory', label: 'Memory' },
+  { key: 'context', path: '/context', label: 'Context' },
   { key: 'workflow', path: '/workflow-studio', label: 'Workflow' },
   { key: 'knowledge', path: '/knowledge-base', label: 'Knowledge' },
   { key: 'observability', path: '/observability', label: 'Observability' }
