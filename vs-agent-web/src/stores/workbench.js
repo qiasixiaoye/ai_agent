@@ -1,17 +1,12 @@
 import { defineStore } from 'pinia'
 
 export const WORKBENCH_AREAS = [
-  { key: 'chat', path: '/', label: 'Chat' },
-  { key: 'agent', path: '/agent', label: 'Agent' },
-  { key: 'tools', path: '/tools', label: 'Tools' },
-  { key: 'skills', path: '/skills', label: 'Skills' },
-  { key: 'mcp', path: '/mcp', label: 'MCP' },
-  { key: 'runtime', path: '/runtime', label: 'Runtime' },
-  { key: 'memory', path: '/memory', label: 'Memory' },
-  { key: 'context', path: '/context', label: 'Context' },
-  { key: 'workflow', path: '/workflow-studio', label: 'Workflow' },
-  { key: 'knowledge', path: '/knowledge-base', label: 'Knowledge' },
-  { key: 'observability', path: '/observability', label: 'Observability' }
+  { key: 'chat', path: '/', label: '对话中枢', description: '普通对话、知识问答、智能体模式' },
+  { key: 'agent', path: '/agent', label: '任务执行', description: '多步骤任务与演示能力' },
+  { key: 'capabilities', path: '/capabilities', label: '能力中心', description: '工具、技能、权限与运行态' },
+  { key: 'knowledge', path: '/knowledge-base', label: '知识资产', description: '文档、记忆、上下文' },
+  { key: 'workflow', path: '/workflow-studio', label: '工作流', description: '需求生成、导入、观测 Dify' },
+  { key: 'observability', path: '/observability', label: '运行观测', description: '请求链路与失败排查' }
 ]
 
 export const useWorkbenchStore = defineStore('workbench', {

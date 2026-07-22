@@ -4,12 +4,13 @@
       <strong>{{ label }}</strong>
       <p v-if="reason">{{ reason }}</p>
     </div>
-    <button v-if="risk === 'confirm' && !confirmed" type="button" @click="$emit('confirm')">Confirm</button>
+    <button v-if="risk === 'confirm' && !confirmed" type="button" @click="$emit('confirm')">确认</button>
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import { riskLabel } from '../../utils/productText'
 
 const props = defineProps({
   risk: { type: String, default: 'unknown' },
@@ -18,13 +19,7 @@ const props = defineProps({
 })
 defineEmits(['confirm'])
 
-const label = computed(() => ({
-  safe: 'Safe',
-  confirm: 'Confirmation required',
-  blocked: 'Blocked',
-  unknown: 'Unknown risk'
-}[props.risk] || 'Unknown risk')
-)
+const label = computed(() => riskLabel(props.risk))
 </script>
 
 <style scoped>

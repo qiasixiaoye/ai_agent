@@ -6,8 +6,9 @@ import {
   addSemanticMemory,
   clearConversationMemory
 } from '../services/api'
+import { productErrorMessage } from '../utils/productText'
 
-const messageOf = (error) => error?.message || 'Request failed'
+const messageOf = (error) => productErrorMessage(error, '记忆服务')
 
 export const useMemoryStore = defineStore('memory', {
   state: () => ({
@@ -58,7 +59,7 @@ export const useMemoryStore = defineStore('memory', {
       const assistant = String(assistantMessage || '').trim()
       if (!user || !assistant || assistant.length < 80) return
       this.suggestion = {
-        content: `User asked: ${user}\nUseful answer summary: ${assistant.slice(0, 600)}`,
+        content: `用户问题：${user}\n可复用回答摘要：${assistant.slice(0, 600)}`,
         importance: 0.8,
         status: 'pending'
       }
@@ -89,7 +90,7 @@ export const useMemoryStore = defineStore('memory', {
     },
     async writeManual(conversationId, { content, importance = 0.8 }) {
       const text = String(content || '').trim()
-      if (!text) throw new Error('Memory content is required')
+      if (!text) throw new Error('记忆内容不能为空')
       this.writing = true
       try {
         const result = await addSemanticMemory(conversationId, text, Math.min(1, Math.max(0, Number(importance) || 0)))

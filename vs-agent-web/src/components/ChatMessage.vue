@@ -1,6 +1,6 @@
 <template>
   <div :class="['message', isUser ? 'user-message' : 'ai-message']">
-    <div class="avatar"><span>{{ isUser ? 'You' : 'AI' }}</span></div>
+    <div class="avatar"><span>{{ isUser ? '你' : 'AI' }}</span></div>
     <div class="message-content">
       <div class="message-text" v-html="formattedMessage"></div>
       <div class="message-meta">
@@ -8,7 +8,7 @@
         <span v-if="formattedTime" class="message-time">{{ formattedTime }}</span>
       </div>
       <details v-if="detailsText" class="message-details">
-        <summary>Details</summary>
+        <summary>详情</summary>
         <pre>{{ detailsText }}</pre>
       </details>
     </div>
@@ -35,9 +35,9 @@ const formattedTime = computed(() => {
 })
 
 const statusText = computed(() => ({
-  streaming: 'Streaming',
-  incomplete: 'Response interrupted',
-  error: 'Connection error'
+  streaming: '生成中',
+  incomplete: '响应未完成',
+  error: '连接异常'
 }[props.status] || ''))
 
 const detailsText = computed(() => {
@@ -114,7 +114,7 @@ const formattedMessage = computed(() => {
   width: 30px;
   height: 30px;
   margin: 0 8px;
-  border-radius: 6px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -127,7 +127,7 @@ const formattedMessage = computed(() => {
 .message-content {
   padding: 9px 12px;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: 14px;
   background: var(--color-panel-muted);
   color: var(--color-text);
 }

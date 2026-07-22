@@ -1,17 +1,20 @@
 :root {
-  --color-bg: #0f1115;
-  --color-panel: #161a22;
-  --color-panel-muted: #1d222c;
-  --color-border: #2a303b;
-  --color-text: #eef1f5;
-  --color-text-muted: #a7afbd;
-  --color-text-subtle: #747d8c;
-  --color-primary: #5aa7ff;
-  --color-success: #4fbf7f;
-  --color-warning: #d8a84f;
-  --color-danger: #df6b6b;
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --shadow-panel: 0 10px 30px rgba(0, 0, 0, 0.28);
+  --color-bg: #0b1020;
+  --color-bg-elevated: #111827;
+  --color-panel: rgba(17, 24, 39, 0.84);
+  --color-panel-muted: rgba(30, 41, 59, 0.82);
+  --color-border: rgba(148, 163, 184, 0.18);
+  --color-text: #f8fafc;
+  --color-text-muted: #aab6c8;
+  --color-text-subtle: #718096;
+  --color-primary: #60a5fa;
+  --color-primary-strong: #38bdf8;
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-danger: #fb7185;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --shadow-panel: 0 20px 60px rgba(0, 0, 0, 0.26);
   --shadow-focus: 0 0 0 3px rgba(90, 167, 255, 0.24);
 }

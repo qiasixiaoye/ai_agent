@@ -1,70 +1,48 @@
 <template>
-  <aside class="inspector-panel" aria-label="Context inspector">
-    <WorkbenchSection title="Conversation">
+  <aside class="inspector-panel" aria-label="上下文检查器">
+    <WorkbenchSection title="当前会话">
       <dl class="inspector-details">
-        <div><dt>Id</dt><dd>{{ conversationId || 'No conversation' }}</dd></div>
-        <div><dt>Mode</dt><dd>{{ activeMode }}</dd></div>
+        <div><dt>会话</dt><dd>{{ conversationId || '尚未创建' }}</dd></div>
+        <div><dt>模式</dt><dd>{{ modeLabel }}</dd></div>
       </dl>
     </WorkbenchSection>
 
-    <WorkbenchSection title="Memory suggestion">
-      <label for="memory-content">Content</label>
-      <textarea id="memory-content" v-model="suggestionContent" rows="4" placeholder="Add a durable fact or preference"></textarea>
-      <label for="memory-importance">Importance</label>
-      <input id="memory-importance" v-model.number="suggestionImportance" type="number" min="0" max="1" step="0.1" />
+    <WorkbenchSection title="记忆建议">
+      <p class="muted">对话产生可复用信息时，会在这里生成候选记忆。确认后再写入长期记忆。</p>
+      <textarea id="memory-content" v-model="suggestionContent" rows="4" placeholder="暂无候选记忆"></textarea>
       <button type="button" :disabled="!conversationId || !suggestionContent.trim() || memory.writing" @click="writeMemory">
-        {{ memory.writing ? 'Writing…' : 'Write memory' }}
+        {{ memory.writing ? '写入中…' : '写入记忆' }}
       </button>
-      <p v-if="memory.suggestion?.status === 'failed'" class="status-error">{{ memory.error || 'Memory write failed.' }}</p>
-      <p v-else-if="memory.suggestion?.status === 'written'" class="status-success">Memory written.</p>
+      <p v-if="memory.suggestion?.status === 'failed'" class="status-error">{{ memory.error || '记忆写入失败。' }}</p>
+      <p v-else-if="memory.suggestion?.status === 'written'" class="status-success">记忆已写入。</p>
     </WorkbenchSection>
 
-    <WorkbenchSection title="Context preview">
-      <p class="muted">{{ previewQuery || 'Send a message to inspect its context.' }}</p>
+    <WorkbenchSection title="上下文预览">
+      <p class="muted">{{ previewQuery || '发送消息后可查看将进入模型的上下文摘要。' }}</p>
       <button type="button" :disabled="!conversationId || !previewQuery || previewing" @click="previewContext">
-        {{ previewing ? 'Loading…' : 'Preview context' }}
+        {{ previewing ? '加载中…' : '预览上下文' }}
       </button>
       <dl v-if="memory.contextPreview" class="inspector-details">
-        <div><dt>Tokens</dt><dd>{{ memory.contextPreview.estimatedTokens }} / {{ memory.contextPreview.tokenBudget }}</dd></div>
-        <div><dt>Tiers</dt><dd>{{ (memory.contextPreview.includedTiers || []).join(', ') || 'None' }}</dd></div>
-      </dl>
-      <pre v-if="memory.contextPreview?.contextText">{{ memory.contextPreview.contextText }}</pre>
-    </WorkbenchSection>
-
-    <WorkbenchSection title="Diagnostics">
-      <p v-if="!memory.diagnostics" class="muted">Preview context to load diagnostics.</p>
-      <dl v-else class="inspector-details diagnostics-list">
-        <template v-for="bucket in diagnosticBuckets" :key="bucket.label">
-          <div v-if="bucket.value !== undefined && bucket.value !== null">
-            <dt>{{ bucket.label }}</dt>
-            <dd>{{ formatBucket(bucket.value) }}</dd>
-          </div>
-        </template>
+        <div><dt>预算</dt><dd>{{ memory.contextPreview.estimatedTokens }} / {{ memory.contextPreview.tokenBudget }}</dd></div>
+        <div><dt>层级</dt><dd>{{ (memory.contextPreview.includedTiers || []).join('、') || '无' }}</dd></div>
       </dl>
     </WorkbenchSection>
 
-    <WorkbenchSection title="Tools & permissions">
-      <p class="muted">Runtime: {{ runtime.status }}</p>
-      <p v-if="!runtime.tools.length" class="muted">No managed tools loaded.</p>
-      <div v-else class="tool-list">
-        <div v-for="tool in runtime.tools" :key="toolKey(tool)" class="tool-item">
-          <strong>{{ toolLabel(tool) }}</strong>
-          <PermissionNotice
-            :risk="runtime.riskForTool(tool)"
-            :reason="tool.description || tool.reason || ''"
-            :confirmed="confirmedTools.includes(toolKey(tool))"
-            @confirm="confirmTool(tool)"
-          />
-        </div>
-      </div>
+    <WorkbenchSection title="权限摘要">
+      <p class="muted">能力中心会在高风险工具调用前要求确认。</p>
+      <dl class="inspector-details">
+        <div><dt>运行态</dt><dd>{{ statusLabel(runtime.status) }}</dd></div>
+        <div><dt>工具数</dt><dd>{{ runtime.tools.length }}</dd></div>
+      </dl>
+      <p v-if="runtime.unavailable" class="muted">当前环境未开启 MCP 治理接口。</p>
     </WorkbenchSection>
 
-    <WorkbenchSection title="Recent calls">
-      <p v-if="!workbench.recentInvocations.length" class="muted">No recent calls.</p>
+    <WorkbenchSection title="最近动作">
+      <p v-if="!workbench.recentInvocations.length" class="muted">暂无调用记录。</p>
       <ul v-else class="invocation-list">
         <li v-for="invocation in workbench.recentInvocations" :key="invocation.id">
           <strong>{{ invocation.name || invocation.operation || invocation.source }}</strong>
-          <span>{{ invocation.status }} · {{ invocation.summary }}</span>
+          <span>{{ statusLabel(invocation.status) }} · {{ invocation.summary }}</span>
         </li>
       </ul>
     </WorkbenchSection>
@@ -74,43 +52,33 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import WorkbenchSection from './WorkbenchSection.vue'
-import PermissionNotice from './PermissionNotice.vue'
 import { useChatStore } from '../../stores/chat'
 import { useMemoryStore } from '../../stores/memory'
 import { useRuntimeStore } from '../../stores/runtime'
 import { useWorkbenchStore } from '../../stores/workbench'
+import { statusLabel } from '../../utils/productText'
 
 const chatStore = useChatStore()
 const memory = useMemoryStore()
 const runtime = useRuntimeStore()
 const workbench = useWorkbenchStore()
 const previewing = ref(false)
-const confirmedTools = ref([])
 const suggestionContent = ref('')
-const suggestionImportance = ref(0.8)
 
 const conversationId = computed(() => workbench.currentConversationId)
 const chatMessages = computed(() => chatStore.assistantAppChats[conversationId.value]?.messages || [])
 const lastUserMessage = computed(() => [...chatMessages.value].reverse().find((message) => message.isUser)?.content || '')
 const previewQuery = computed(() => lastUserMessage.value.trim())
-const activeMode = computed(() => workbench.currentMode)
-const diagnosticBuckets = computed(() => {
-  const diagnostics = memory.diagnostics || {}
-  return [
-    { label: 'Mode', value: diagnostics.mode },
-    { label: 'Budget plan', value: diagnostics.budgetPlan },
-    { label: 'History', value: diagnostics.history },
-    { label: 'Memory', value: diagnostics.memoryContext },
-    { label: 'Skills', value: diagnostics.skillContext },
-    { label: 'Exposed tools', value: diagnostics.exposedTools }
-  ]
-})
+const modeLabel = computed(() => ({
+  normal: '普通对话',
+  rag: '知识库',
+  agent: '智能体'
+}[workbench.currentMode] || '普通对话'))
 
 watch(
   () => memory.suggestion,
   (suggestion) => {
     suggestionContent.value = suggestion?.content || ''
-    suggestionImportance.value = suggestion?.importance ?? 0.8
   },
   { immediate: true, deep: true }
 )
@@ -125,59 +93,36 @@ onMounted(() => {
 })
 
 const writeMemory = async () => {
-  memory.updateSuggestion({
-    content: suggestionContent.value.trim(),
-    importance: suggestionImportance.value
-  })
+  memory.updateSuggestion({ content: suggestionContent.value.trim(), importance: 0.8 })
   try {
     await memory.writeSuggestion(conversationId.value)
   } catch {
-    // The store exposes the write failure beside the editor.
+    // 错误由 store 暴露在当前卡片里。
   }
 }
 
 const previewContext = async () => {
   previewing.value = true
   try {
-    await Promise.all([
-      memory.previewContext(conversationId.value, previewQuery.value),
-      memory.loadDiagnostics(conversationId.value, previewQuery.value)
-    ])
+    await memory.previewContext(conversationId.value, previewQuery.value)
   } finally {
     previewing.value = false
   }
 }
-
-const toolKey = (tool) => tool?.name || tool?.toolName || tool?.id || 'unknown-tool'
-const toolLabel = (tool) => tool?.displayName || tool?.name || tool?.toolName || 'Unnamed tool'
-const confirmTool = (tool) => {
-  const key = toolKey(tool)
-  if (!confirmedTools.value.includes(key)) confirmedTools.value = [...confirmedTools.value, key]
-}
-const formatBucket = (value) => typeof value === 'string'
-  ? value
-  : Array.isArray(value)
-    ? value.join(', ') || 'None'
-    : JSON.stringify(value)
 </script>
 
 <style scoped>
 .inspector-panel { display: grid; align-content: start; gap: 12px; overflow-y: auto; }
 .inspector-panel :deep(.workbench-section) { padding: 14px; box-shadow: none; }
-.inspector-panel label { display: block; margin: 10px 0 4px; color: var(--color-text-muted); font-size: 0.75rem; font-weight: 700; }
-.inspector-panel textarea, .inspector-panel input { width: 100%; padding: 7px 8px; color: var(--color-text); background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-sm); resize: vertical; }
-.inspector-panel button { width: 100%; margin-top: 10px; padding: 6px 10px; color: #0f1115; background: var(--color-primary); border: 0; border-radius: var(--radius-sm); }
+.inspector-panel textarea { width: 100%; margin-top: 10px; padding: 9px 10px; color: var(--color-text); background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: var(--radius-sm); resize: vertical; }
+.inspector-panel button { width: 100%; margin-top: 10px; padding: 8px 10px; color: #07111f; background: linear-gradient(135deg, var(--color-primary), var(--color-primary-strong)); border: 0; border-radius: var(--radius-sm); font-weight: 800; }
 .inspector-panel button:disabled { color: var(--color-text-subtle); background: var(--color-panel-muted); cursor: not-allowed; }
-.inspector-details { display: grid; gap: 6px; margin: 0; font-size: 0.78rem; }
-.inspector-details div { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 8px; }
+.inspector-details { display: grid; gap: 7px; margin: 0; font-size: 0.8rem; }
+.inspector-details div { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; }
 .inspector-details dt { color: var(--color-text-subtle); }
 .inspector-details dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
-.diagnostics-list dd { white-space: pre-wrap; }
 .status-error { margin: 8px 0 0; color: var(--color-danger); font-size: 0.78rem; }
 .status-success { margin: 8px 0 0; color: var(--color-success); font-size: 0.78rem; }
-pre { max-height: 180px; margin: 10px 0 0; padding: 8px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--color-text-muted); background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-sm); font: inherit; font-size: 0.75rem; }
-.tool-list { display: grid; gap: 8px; }
-.tool-item { display: grid; gap: 5px; font-size: 0.78rem; }
 .invocation-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .invocation-list li { display: grid; gap: 2px; font-size: 0.78rem; }
 .invocation-list span { color: var(--color-text-muted); overflow-wrap: anywhere; }

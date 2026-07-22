@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
 import { listSkills, getSkill, executeSkill, previewSkillRoute, evaluateSkillRouting } from '../services/api'
+import { productErrorMessage } from '../utils/productText'
 
-const messageOf = (error) => error?.message || 'Request failed'
+const messageOf = (error) => productErrorMessage(error, '技能目录')
 
 export const useSkillsStore = defineStore('skills', {
   state: () => ({
@@ -58,7 +59,7 @@ export const useSkillsStore = defineStore('skills', {
       }
     },
     async executeSelected(args) {
-      if (!this.selected?.name) throw new Error('No Skill selected')
+      if (!this.selected?.name) throw new Error('请先选择一个技能')
       this.executing = true
       try {
         this.lastResult = await executeSkill(this.selected.name, args)

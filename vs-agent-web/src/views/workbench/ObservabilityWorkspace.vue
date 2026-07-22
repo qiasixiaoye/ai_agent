@@ -1,11 +1,70 @@
 <template>
   <section class="workspace">
-    <header class="workspace-header"><div><h1>Observability</h1><p class="muted">Query individual request traces, session activity, and failures.</p></div></header>
+    <header class="workspace-header">
+      <div>
+        <h1>运行观测</h1>
+        <p class="muted">查看请求链路、会话活动和失败记录，用于排查 Agent 每一步消耗与错误。</p>
+      </div>
+    </header>
+
     <div class="workspace-grid">
-      <WorkbenchSection title="Request trace" class="panel"><div class="form-row"><input v-model.trim="requestId" placeholder="Request ID" /><button type="button" :disabled="traceLoading || !requestId" @click="loadTrace">{{ traceLoading ? 'Loading...' : 'Query trace' }}</button></div><p v-if="traceError" class="status-error">{{ traceError }}</p><template v-if="trace"><div class="summary"><span><b>Request</b>{{ trace.request?.requestId || requestId }}</span><span><b>Session</b>{{ trace.request?.sessionId || '-' }}</span><span><b>Status</b>{{ trace.request?.status || '-' }}</span><span><b>Elapsed</b>{{ elapsed }}</span></div><p v-if="traceErrorText" class="status-error">{{ traceErrorText }}</p><div v-if="trace.stages?.length" class="stages"><article v-for="stage in trace.stages" :key="stage.id" :class="{ failed: stage.success === false }"><strong>{{ stage.stageName || stage.stageType || 'Stage' }}</strong><span>{{ stage.costMs != null ? `${stage.costMs} ms` : '' }}</span><p v-if="stage.errorMessage">{{ stage.errorMessage }}</p></article></div></template></WorkbenchSection>
-      <WorkbenchSection title="Session requests" class="panel"><div class="form-row"><input v-model.trim="sessionId" placeholder="Session ID" /><input v-model.number="sessionLimit" type="number" min="1" max="200" /><button type="button" :disabled="sessionLoading || !sessionId" @click="loadSession">{{ sessionLoading ? 'Loading...' : 'Query session' }}</button></div><p v-if="sessionError" class="status-error">{{ sessionError }}</p><p v-if="sessionRows.length" class="muted">{{ sessionRows.length }} request(s)</p><div v-if="sessionRows.length" class="rows"><button v-for="row in sessionRows" :key="row.requestId" type="button" @click="openRow(row)"><strong>{{ row.requestId }}</strong><span>{{ row.status || '-' }} · {{ row.totalCostMs ?? '-' }} ms</span></button></div></WorkbenchSection>
+      <WorkbenchSection title="请求链路" class="panel">
+        <div class="form-row">
+          <input v-model.trim="requestId" placeholder="请求 ID" />
+          <button type="button" :disabled="traceLoading || !requestId" @click="loadTrace">{{ traceLoading ? '查询中…' : '查询链路' }}</button>
+        </div>
+        <p v-if="traceError" class="status-error">{{ traceError }}</p>
+        <template v-if="trace">
+          <div class="summary">
+            <span><b>请求</b>{{ trace.request?.requestId || requestId }}</span>
+            <span><b>会话</b>{{ trace.request?.sessionId || '-' }}</span>
+            <span><b>状态</b>{{ trace.request?.status || '-' }}</span>
+            <span><b>耗时</b>{{ elapsed }}</span>
+          </div>
+          <p v-if="traceErrorText" class="status-error">{{ traceErrorText }}</p>
+          <div v-if="trace.stages?.length" class="stages">
+            <article v-for="stage in trace.stages" :key="stage.id" :class="{ failed: stage.success === false }">
+              <strong>{{ stage.stageName || stage.stageType || '阶段' }}</strong>
+              <span>{{ stage.costMs != null ? `${stage.costMs} ms` : '' }}</span>
+              <p v-if="stage.errorMessage">{{ stage.errorMessage }}</p>
+            </article>
+          </div>
+        </template>
+      </WorkbenchSection>
+
+      <WorkbenchSection title="会话请求" class="panel">
+        <div class="form-row">
+          <input v-model.trim="sessionId" placeholder="会话 ID" />
+          <input v-model.number="sessionLimit" type="number" min="1" max="200" />
+          <button type="button" :disabled="sessionLoading || !sessionId" @click="loadSession">{{ sessionLoading ? '查询中…' : '查询会话' }}</button>
+        </div>
+        <p v-if="sessionError" class="status-error">{{ sessionError }}</p>
+        <p v-if="sessionRows.length" class="muted">共 {{ sessionRows.length }} 条请求</p>
+        <div v-if="sessionRows.length" class="rows">
+          <button v-for="row in sessionRows" :key="row.requestId" type="button" @click="openRow(row)">
+            <strong>{{ row.requestId }}</strong>
+            <span>{{ row.status || '-' }} · {{ row.totalCostMs ?? '-' }} ms</span>
+          </button>
+        </div>
+      </WorkbenchSection>
     </div>
-    <WorkbenchSection title="Failed requests" class="panel"><div class="form-row"><input v-model="failStart" type="datetime-local" /><input v-model="failEnd" type="datetime-local" /><input v-model.number="failLimit" type="number" min="1" max="500" /><button type="button" :disabled="failedLoading || !failStart || !failEnd" @click="loadFailures">{{ failedLoading ? 'Loading...' : 'Query failures' }}</button></div><p v-if="failedError" class="status-error">{{ failedError }}</p><div v-if="failedRows.length" class="rows"><button v-for="row in failedRows" :key="row.requestId" type="button" @click="openRow(row)"><strong>{{ row.requestId }}</strong><span>{{ row.sessionId || '-' }} · {{ row.errorMessage || row.status || 'Failed' }}</span></button></div><p v-else-if="failQueried" class="muted">No failed requests were found in this time range.</p></WorkbenchSection>
+
+    <WorkbenchSection title="失败记录" class="panel">
+      <div class="form-row">
+        <input v-model="failStart" type="datetime-local" />
+        <input v-model="failEnd" type="datetime-local" />
+        <input v-model.number="failLimit" type="number" min="1" max="500" />
+        <button type="button" :disabled="failedLoading || !failStart || !failEnd" @click="loadFailures">{{ failedLoading ? '查询中…' : '查询失败' }}</button>
+      </div>
+      <p v-if="failedError" class="status-error">{{ failedError }}</p>
+      <div v-if="failedRows.length" class="rows">
+        <button v-for="row in failedRows" :key="row.requestId" type="button" @click="openRow(row)">
+          <strong>{{ row.requestId }}</strong>
+          <span>{{ row.sessionId || '-' }} · {{ row.errorMessage || row.status || '失败' }}</span>
+        </button>
+      </div>
+      <p v-else-if="failQueried" class="muted">当前时间范围内没有失败请求。</p>
+    </WorkbenchSection>
   </section>
 </template>
 
@@ -14,17 +73,106 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import WorkbenchSection from '../../components/workbench/WorkbenchSection.vue'
 import { queryFailedRequests, queryRequestTrace, querySessionRequests } from '../../services/api'
+import { productErrorMessage } from '../../utils/productText'
 
-const route = useRoute(); const requestId = ref(''); const sessionId = ref(''); const sessionLimit = ref(20); const failStart = ref(''); const failEnd = ref(''); const failLimit = ref(100); const trace = ref(null); const sessionRows = ref([]); const failedRows = ref([]); const traceError = ref(''); const sessionError = ref(''); const failedError = ref(''); const traceLoading = ref(false); const sessionLoading = ref(false); const failedLoading = ref(false); const failQueried = ref(false)
-const elapsed = computed(() => { const value = trace.value?.request?.totalCostMs ?? trace.value?.request?.elapsedTime; return value == null ? '-' : String(value).includes('ms') ? value : `${value} ms` })
+const route = useRoute()
+const requestId = ref('')
+const sessionId = ref('')
+const sessionLimit = ref(20)
+const failStart = ref('')
+const failEnd = ref('')
+const failLimit = ref(100)
+const trace = ref(null)
+const sessionRows = ref([])
+const failedRows = ref([])
+const traceError = ref('')
+const sessionError = ref('')
+const failedError = ref('')
+const traceLoading = ref(false)
+const sessionLoading = ref(false)
+const failedLoading = ref(false)
+const failQueried = ref(false)
+const elapsed = computed(() => {
+  const value = trace.value?.request?.totalCostMs ?? trace.value?.request?.elapsedTime
+  return value == null ? '-' : String(value).includes('ms') ? value : `${value} ms`
+})
 const traceErrorText = computed(() => trace.value?.request?.errorMessage || trace.value?.stages?.find((stage) => stage.success === false)?.errorMessage || '')
-const loadTrace = async () => { traceLoading.value = true; traceError.value = ''; trace.value = null; try { trace.value = await queryRequestTrace(requestId.value) } catch (cause) { traceError.value = cause?.message || 'Trace query failed.' } finally { traceLoading.value = false } }
-const loadSession = async () => { sessionLoading.value = true; sessionError.value = ''; sessionRows.value = []; try { sessionRows.value = await querySessionRequests(sessionId.value, sessionLimit.value || 20) } catch (cause) { sessionError.value = cause?.message || 'Session query failed.' } finally { sessionLoading.value = false } }
-const loadFailures = async () => { failedLoading.value = true; failedError.value = ''; failedRows.value = []; failQueried.value = true; try { failedRows.value = await queryFailedRequests(failStart.value, failEnd.value, failLimit.value || 100) } catch (cause) { failedError.value = cause?.message || 'Failed request query failed.' } finally { failedLoading.value = false } }
-const openRow = (row) => { requestId.value = row.requestId; if (row.sessionId) sessionId.value = row.sessionId; loadTrace() }
-onMounted(() => { if (typeof route.query.requestId === 'string' && route.query.requestId) { requestId.value = route.query.requestId; loadTrace() }; if (typeof route.query.sessionId === 'string' && route.query.sessionId) { sessionId.value = route.query.sessionId; loadSession() } })
+const loadTrace = async () => {
+  traceLoading.value = true
+  traceError.value = ''
+  trace.value = null
+  try {
+    trace.value = await queryRequestTrace(requestId.value)
+  } catch (cause) {
+    traceError.value = productErrorMessage(cause, '运行观测')
+  } finally {
+    traceLoading.value = false
+  }
+}
+const loadSession = async () => {
+  sessionLoading.value = true
+  sessionError.value = ''
+  sessionRows.value = []
+  try {
+    sessionRows.value = await querySessionRequests(sessionId.value, sessionLimit.value || 20)
+  } catch (cause) {
+    sessionError.value = productErrorMessage(cause, '会话观测')
+  } finally {
+    sessionLoading.value = false
+  }
+}
+const loadFailures = async () => {
+  failedLoading.value = true
+  failedError.value = ''
+  failedRows.value = []
+  failQueried.value = true
+  try {
+    failedRows.value = await queryFailedRequests(failStart.value, failEnd.value, failLimit.value || 100)
+  } catch (cause) {
+    failedError.value = productErrorMessage(cause, '失败记录')
+  } finally {
+    failedLoading.value = false
+  }
+}
+const openRow = (row) => {
+  requestId.value = row.requestId
+  if (row.sessionId) sessionId.value = row.sessionId
+  loadTrace()
+}
+onMounted(() => {
+  if (typeof route.query.requestId === 'string' && route.query.requestId) {
+    requestId.value = route.query.requestId
+    loadTrace()
+  }
+  if (typeof route.query.sessionId === 'string' && route.query.sessionId) {
+    sessionId.value = route.query.sessionId
+    loadSession()
+  }
+})
 </script>
 
 <style scoped>
-.workspace { display: grid; gap: 16px; padding: 20px; }.workspace-header h1 { margin: 0 0 4px; font-size: 1.2rem; }.workspace-header p { margin: 0; }.workspace-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr); gap: 16px; }.panel { display: grid; align-content: start; gap: 10px; }.form-row { display: flex; flex-wrap: wrap; gap: 8px; }.form-row input { min-width: 120px; flex: 1; padding: 9px; color: var(--color-text); background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-sm); }.summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }.summary span { display: grid; gap: 3px; padding: 8px; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-sm); overflow-wrap: anywhere; }.summary b { color: var(--color-text-muted); font-size: .75rem; }.stages, .rows { display: grid; gap: 8px; }.stages article, .rows button { display: grid; gap: 4px; padding: 9px; text-align: left; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-sm); }.stages article.failed { border-color: var(--color-danger); }.stages span, .rows span { color: var(--color-text-muted); font-size: .78rem; }.stages p { margin: 0; color: var(--color-danger); font-size: .8rem; }.status-error { margin: 0; color: var(--color-danger); }button { cursor: pointer; }button:disabled { opacity: .55; cursor: not-allowed; }@media (max-width: 800px) { .workspace { padding: 14px; }.workspace-grid, .summary { grid-template-columns: 1fr; } }
+.workspace { display: grid; gap: 16px; padding: 20px; }
+.workspace-header { padding: 22px; background: var(--color-panel); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
+.workspace-header h1 { margin: 0 0 4px; font-size: 1.7rem; }
+.workspace-header p { margin: 0; }
+.workspace-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr); gap: 16px; }
+.panel { display: grid; align-content: start; gap: 10px; }
+.form-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.form-row input { min-width: 120px; flex: 1; padding: 10px; color: var(--color-text); background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: var(--radius-sm); }
+.summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.summary span { display: grid; gap: 3px; padding: 9px; background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: var(--radius-sm); overflow-wrap: anywhere; }
+.summary b { color: var(--color-text-muted); font-size: .75rem; }
+.stages, .rows { display: grid; gap: 8px; }
+.stages article, .rows button { display: grid; gap: 4px; padding: 10px; color: var(--color-text); text-align: left; background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: var(--radius-sm); }
+.stages article.failed { border-color: var(--color-danger); }
+.stages span, .rows span { color: var(--color-text-muted); font-size: .78rem; }
+.stages p { margin: 0; color: var(--color-danger); font-size: .8rem; }
+.status-error { margin: 0; color: var(--color-danger); }
+button { cursor: pointer; }
+button:disabled { opacity: .55; cursor: not-allowed; }
+@media (max-width: 800px) {
+  .workspace { padding: 14px; }
+  .workspace-grid, .summary { grid-template-columns: 1fr; }
+}
 </style>

@@ -4,13 +4,13 @@
       ref="inputRef"
       v-model="message"
       class="chat-input"
-      aria-label="Message"
-      placeholder="Message the assistant"
+      aria-label="消息"
+      placeholder="输入你的问题或任务，Enter 发送，Shift+Enter 换行"
       :disabled="loading"
       @keydown.enter.prevent="onSubmit"
     ></textarea>
     <button class="send-button" type="button" :disabled="loading || !message.trim()" @click="onSubmit">
-      Send
+      发送
     </button>
   </div>
 </template>
@@ -50,12 +50,12 @@ const onSubmit = () => {
   max-height: 128px;
   padding: 10px 12px;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   outline: none;
   resize: vertical;
   font: inherit;
   font-size: 0.9rem;
-  background: var(--color-panel-muted);
+  background: var(--color-bg-elevated);
   color: var(--color-text);
 }
 .chat-input::placeholder { color: var(--color-text-subtle); }
@@ -65,9 +65,9 @@ const onSubmit = () => {
   height: 42px;
   padding: 0 16px;
   border: 1px solid var(--color-primary);
-  border-radius: 6px;
-  background: var(--color-primary);
-  color: var(--color-on-primary, #fff);
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-strong));
+  color: #07111f;
   cursor: pointer;
   font-weight: 700;
 }

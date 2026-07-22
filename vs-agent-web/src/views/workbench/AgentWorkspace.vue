@@ -2,55 +2,55 @@
   <section class="workspace">
     <header class="workspace-header">
       <div>
-        <h1>Agent platform</h1>
-        <p class="muted">Run registered capabilities, direct task definitions, and the included demonstrations.</p>
+        <h1>任务执行</h1>
+        <p class="muted">面向 Agent 产品的任务运行台：选择能力、提交任务、查看结果。</p>
       </div>
-      <button type="button" :disabled="catalogLoading" @click="refreshTools">{{ catalogLoading ? 'Refreshing...' : 'Refresh catalog' }}</button>
+      <button type="button" :disabled="catalogLoading" @click="refreshTools">{{ catalogLoading ? '刷新中…' : '刷新能力' }}</button>
     </header>
 
     <p v-if="localError" class="status-error">{{ localError }}</p>
 
     <div class="workspace-grid">
-      <WorkbenchSection title="Capability catalog" class="panel">
-        <p v-if="!catalogLoading && !tools.length" class="muted">No platform tools are available from the backend.</p>
-        <label for="platform-tool">Tool</label>
+      <WorkbenchSection title="能力调用" class="panel">
+        <p v-if="!catalogLoading && !tools.length" class="muted">当前后端未返回可直接调用的 Agent 能力。</p>
+        <label for="platform-tool">能力</label>
         <select id="platform-tool" v-model="selectedToolName" :disabled="!tools.length || toolRunning">
           <option v-for="tool in tools" :key="toolKey(tool)" :value="toolKey(tool)">{{ toolLabel(tool) }}</option>
         </select>
-        <p v-if="selectedTool" class="muted">{{ selectedTool.description || 'No description supplied.' }}</p>
-        <p v-if="selectedTool?.requiredParams?.length" class="muted">Required: {{ selectedTool.requiredParams.join(', ') }}</p>
-        <label for="platform-arguments">Arguments (JSON object)</label>
+        <p v-if="selectedTool" class="muted">{{ describe(selectedTool.description, '该能力暂未提供中文说明。') }}</p>
+        <p v-if="selectedTool?.requiredParams?.length" class="muted">必填参数：{{ selectedTool.requiredParams.join(', ') }}</p>
+        <label for="platform-arguments">入参 JSON 对象</label>
         <textarea id="platform-arguments" v-model="toolArgsJson" rows="7" spellcheck="false" />
         <p v-if="toolJsonError" class="status-error">{{ toolJsonError }}</p>
-        <button type="button" :disabled="!selectedToolName || toolRunning" @click="runTool">{{ toolRunning ? 'Running...' : 'Run tool' }}</button>
+        <button type="button" :disabled="!selectedToolName || toolRunning" @click="runTool">{{ toolRunning ? '执行中…' : '执行能力' }}</button>
         <pre v-if="toolResult">{{ pretty(toolResult) }}</pre>
       </WorkbenchSection>
 
       <div class="stack">
-        <WorkbenchSection title="Direct task execution" class="panel">
-          <p class="muted">Paste a task object with its steps and tool arguments.</p>
+        <WorkbenchSection title="任务 JSON" class="panel">
+          <p class="muted">适合验证多步骤任务编排，粘贴任务对象后直接运行。</p>
           <textarea v-model="taskJson" rows="10" spellcheck="false" aria-label="Task JSON" />
           <p v-if="taskJsonError" class="status-error">{{ taskJsonError }}</p>
-          <button type="button" :disabled="taskRunning" @click="runTask">{{ taskRunning ? 'Running...' : 'Run task JSON' }}</button>
+          <button type="button" :disabled="taskRunning" @click="runTask">{{ taskRunning ? '执行中…' : '运行任务' }}</button>
           <pre v-if="taskResult">{{ pretty(taskResult) }}</pre>
         </WorkbenchSection>
 
-        <WorkbenchSection title="Demo task" class="panel">
-          <label for="demo-query">Query</label>
-          <input id="demo-query" v-model="demoQuery" placeholder="Plan a useful research task" @keyup.enter="runDemoTask" />
-          <button type="button" :disabled="demoRunning || !demoQuery.trim()" @click="runDemoTask">{{ demoRunning ? 'Running...' : 'Run demo task' }}</button>
+        <WorkbenchSection title="演示任务" class="panel">
+          <label for="demo-query">任务描述</label>
+          <input id="demo-query" v-model="demoQuery" placeholder="规划一个简短的研究任务" @keyup.enter="runDemoTask" />
+          <button type="button" :disabled="demoRunning || !demoQuery.trim()" @click="runDemoTask">{{ demoRunning ? '执行中…' : '运行演示' }}</button>
           <pre v-if="demoResult">{{ pretty(demoResult) }}</pre>
         </WorkbenchSection>
       </div>
     </div>
 
-    <WorkbenchSection title="Astro demonstration" class="panel astro-panel">
-      <p class="muted">Runs the platform's multi-step astronomy planning workflow.</p>
+    <WorkbenchSection title="星空摄影演示" class="panel astro-panel">
+      <p class="muted">运行内置多步骤规划流程，用于证明 Agent 可串联多个工具完成任务。</p>
       <div class="astro-form">
-        <label>Latitude <input v-model.number="astro.latitude" type="number" step="0.0001" /></label>
-        <label>Longitude <input v-model.number="astro.longitude" type="number" step="0.0001" /></label>
-        <label>Date <input v-model="astro.date" type="date" /></label>
-        <button type="button" :disabled="astroRunning" @click="runAstro">{{ astroRunning ? 'Running...' : 'Run astro demo' }}</button>
+        <label>纬度 <input v-model.number="astro.latitude" type="number" step="0.0001" /></label>
+        <label>经度 <input v-model.number="astro.longitude" type="number" step="0.0001" /></label>
+        <label>日期 <input v-model="astro.date" type="date" /></label>
+        <button type="button" :disabled="astroRunning" @click="runAstro">{{ astroRunning ? '执行中…' : '运行星空演示' }}</button>
       </div>
       <pre v-if="astroResult">{{ pretty(astroResult) }}</pre>
     </WorkbenchSection>
@@ -69,6 +69,7 @@ import {
 } from '../../services/api'
 import { useWorkbenchStore } from '../../stores/workbench'
 import { parseJsonObject } from '../../utils/streamLifecycle'
+import { localizedDescription } from '../../utils/productText'
 
 const workbench = useWorkbenchStore()
 const tools = ref([])
@@ -82,7 +83,7 @@ const taskJson = ref(JSON.stringify({ maxSteps: 1, steps: [] }, null, 2))
 const taskJsonError = ref('')
 const taskResult = ref(null)
 const taskRunning = ref(false)
-const demoQuery = ref('Plan a short research task.')
+const demoQuery = ref('规划一个简短的研究任务。')
 const demoResult = ref(null)
 const demoRunning = ref(false)
 const astroResult = ref(null)
@@ -91,12 +92,13 @@ const localError = ref('')
 const astro = reactive({ latitude: 39.9042, longitude: 116.4074, date: new Date().toISOString().slice(0, 10) })
 
 const toolKey = (tool) => tool?.toolName || tool?.name || tool?.id || ''
-const toolLabel = (tool) => tool?.displayName || toolKey(tool) || 'Unnamed tool'
+const toolLabel = (tool) => tool?.displayName || toolKey(tool) || '未命名能力'
 const selectedTool = computed(() => tools.value.find((tool) => toolKey(tool) === selectedToolName.value) || null)
 const pretty = (value) => JSON.stringify(value, null, 2)
 const invocationStatus = (result) => result?.success === false ? 'failed' : 'complete'
 const resultSummary = (result, fallback) => result?.errorMessage || result?.message || result?.summary || fallback
 const record = (name, result, fallback) => workbench.addInvocation({ source: 'agent-platform', name, status: invocationStatus(result), summary: resultSummary(result, fallback) })
+const describe = (value, fallback) => localizedDescription(value, fallback)
 
 const refreshTools = async () => {
   catalogLoading.value = true
@@ -105,7 +107,7 @@ const refreshTools = async () => {
     tools.value = await listPlatformTools()
     if (!tools.value.some((tool) => toolKey(tool) === selectedToolName.value)) selectedToolName.value = toolKey(tools.value[0])
   } catch (error) {
-    localError.value = error.message || 'Unable to load the platform tool catalog.'
+    localError.value = error.message || '能力目录加载失败。'
   } finally {
     catalogLoading.value = false
   }
@@ -118,7 +120,7 @@ const runTool = async () => {
     const args = parseJsonObject(toolArgsJson.value)
     toolRunning.value = true
     toolResult.value = await executePlatformTool(selectedToolName.value, args)
-    record(toolLabel(selectedTool.value), toolResult.value, 'Platform tool completed.')
+    record(toolLabel(selectedTool.value), toolResult.value, '能力执行完成。')
   } catch (error) {
     if (error.message?.startsWith('Arguments')) toolJsonError.value = error.message
     else localError.value = error.message || 'Platform tool execution failed.'
@@ -134,7 +136,7 @@ const runTask = async () => {
     const task = parseJsonObject(taskJson.value, 'Task')
     taskRunning.value = true
     taskResult.value = await executePlatformTask(task)
-    record('execute-task', taskResult.value, 'Direct platform task completed.')
+    record('执行任务', taskResult.value, '任务执行完成。')
   } catch (error) {
     if (error.message?.startsWith('Task')) taskJsonError.value = error.message
     else localError.value = error.message || 'Direct task execution failed.'
@@ -148,7 +150,7 @@ const runDemoTask = async () => {
   demoRunning.value = true
   try {
     demoResult.value = await executePlatformDemoTask(demoQuery.value.trim())
-    record('demo-task', demoResult.value, 'Demo task completed.')
+    record('演示任务', demoResult.value, '演示任务完成。')
   } catch (error) {
     localError.value = error.message || 'Demo task execution failed.'
   } finally {
@@ -161,7 +163,7 @@ const runAstro = async () => {
   astroRunning.value = true
   try {
     astroResult.value = await runAstroDemo(astro)
-    record('astro-demo', astroResult.value, 'Astro demonstration completed.')
+    record('星空演示', astroResult.value, '星空演示完成。')
   } catch (error) {
     localError.value = error.message || 'Astro demonstration failed.'
   } finally {

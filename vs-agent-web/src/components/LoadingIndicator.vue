@@ -1,6 +1,6 @@
 <template>
   <div class="loading-indicator" role="status" aria-live="polite">
-    <span class="loading-label">Assistant is responding</span>
+    <span class="loading-label">正在生成回复</span>
     <span class="dot"></span>
     <span class="dot"></span>
     <span class="dot"></span>

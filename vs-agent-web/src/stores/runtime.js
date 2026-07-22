@@ -5,8 +5,9 @@ import {
   refreshManagedMcpTools,
   invokeManagedMcpTool
 } from '../services/api'
+import { isOptionalCapabilityUnavailable, productErrorMessage } from '../utils/productText'
 
-const messageOf = (error) => error?.message || 'Request failed'
+const messageOf = (error) => productErrorMessage(error, '能力目录')
 
 export const useRuntimeStore = defineStore('runtime', {
   state: () => ({
@@ -15,11 +16,13 @@ export const useRuntimeStore = defineStore('runtime', {
     loading: false,
     invoking: false,
     error: '',
+    unavailable: false,
     lastResult: null
   }),
   getters: {
     status: (state) => {
       if (state.health?.status) return state.health.status
+      if (state.unavailable) return 'unavailable'
       if (state.error) return 'error'
       if (state.health?.providerAvailable === true) return 'healthy'
       if (state.health?.providerAvailable === false) return 'down'
@@ -36,8 +39,10 @@ export const useRuntimeStore = defineStore('runtime', {
       try {
         this.health = await getMcpRuntimeHealth()
         this.error = ''
+        this.unavailable = false
       } catch (error) {
         this.error = messageOf(error)
+        this.unavailable = isOptionalCapabilityUnavailable(error)
       }
     },
     async loadTools() {
@@ -45,8 +50,11 @@ export const useRuntimeStore = defineStore('runtime', {
       try {
         this.tools = await listManagedMcpTools()
         this.error = ''
+        this.unavailable = false
       } catch (error) {
+        this.tools = []
         this.error = messageOf(error)
+        this.unavailable = isOptionalCapabilityUnavailable(error)
       } finally {
         this.loading = false
       }
@@ -56,8 +64,11 @@ export const useRuntimeStore = defineStore('runtime', {
       try {
         this.tools = await refreshManagedMcpTools()
         this.error = ''
+        this.unavailable = false
       } catch (error) {
+        this.tools = []
         this.error = messageOf(error)
+        this.unavailable = isOptionalCapabilityUnavailable(error)
       } finally {
         this.loading = false
       }

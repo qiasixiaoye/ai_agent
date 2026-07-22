@@ -2,8 +2,8 @@
   <section class="chat-workspace">
     <header class="workspace-header">
       <div>
-        <h1>Chat</h1>
-        <p class="muted">Normal, RAG, and Agent modes share this conversation context.</p>
+        <h1>AI 对话</h1>
+        <p class="muted">普通对话、知识库问答和智能体模式共用同一个上下文。</p>
       </div>
       <SegmentedControl v-model="mode" :options="modeOptions" />
     </header>
@@ -42,9 +42,9 @@ import {
 } from '../../services/api'
 
 const modeOptions = [
-  { value: 'normal', label: 'Chat' },
-  { value: 'rag', label: 'Knowledge' },
-  { value: 'agent', label: 'Agent' }
+  { value: 'normal', label: '普通对话' },
+  { value: 'rag', label: '知识库' },
+  { value: 'agent', label: '智能体' }
 ]
 
 const chatStore = useChatStore()
@@ -73,7 +73,7 @@ onMounted(() => {
   chatId.value = chatStore.createConversation('normal')
   workbench.setConversation(chatId.value)
   chatStore.addMessage(chatId.value, {
-    content: 'Hello. What would you like to work on?',
+    content: '你好，我可以帮你对话、查知识库，或切换到智能体模式执行任务。',
     isUser: false,
     status: 'complete'
   })
@@ -122,7 +122,7 @@ const sendMessage = (message) => {
       memoryStore.suggestMemory({ userMessage: lastUserMessage.value, assistantMessage: aiResponse })
       workbench.addInvocation({
         source: requestMode,
-        name: 'chat',
+        name: '对话',
         status: aiResponse ? 'complete' : 'incomplete',
         summary: lastUserMessage.value.slice(0, 120)
       })
@@ -151,33 +151,30 @@ const sendMessage = (message) => {
     source.onerror = () => {
       if (!assistantMessageAdded) {
         chatStore.addMessage(chatId.value, {
-          content: 'Unable to connect to the assistant. Please check that the backend is running, then try again.',
+          content: '无法连接到对话服务，请确认后端容器已启动后重试。',
           isUser: false,
           mode: requestMode,
           status: 'error',
-          details: 'The assistant stream could not be opened or was interrupted.'
+          details: '后端对话流未能打开，或连接被中断。'
         })
       }
-      // EventSource reports a normal server-side EOF as `error`; a response that
-      // has already streamed is therefore complete unless the server sent an
-      // explicit application-level failure before any content.
       finalize(streamClosureStatus(aiResponse))
     }
   } catch {
     loading.value = false
     chatStore.addMessage(chatId.value, {
-      content: 'Unable to start the assistant. Please check that the backend is running, then try again.',
+      content: '无法启动对话，请确认后端容器已启动后重试。',
       isUser: false,
       mode: requestMode,
       status: 'error',
-      details: 'The browser could not create an assistant stream.'
+      details: '浏览器未能创建对话流。'
     })
     workbench.addInvocation({
       source: requestMode,
       operation: 'assistant-response',
       mode: requestMode,
       status: 'error',
-      summary: 'Assistant stream could not be started.'
+      summary: '对话流启动失败。'
     })
     scrollToBottom()
   }
@@ -188,18 +185,20 @@ const sendMessage = (message) => {
 .chat-workspace {
   display: grid;
   grid-template-rows: auto minmax(260px, 1fr) auto;
-  min-height: calc(100vh - 80px);
+  min-height: calc(100vh - 86px);
   overflow: hidden;
   background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
 }
 
-.workspace-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 20px; border-bottom: 1px solid var(--color-border); }
-.workspace-header h1 { margin: 0 0 4px; font-size: 1.15rem; }
+.workspace-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 22px; border-bottom: 1px solid var(--color-border); }
+.workspace-header h1 { margin: 0 0 4px; font-size: 1.25rem; }
 .workspace-header p { margin: 0; }
-.chat-transcript { min-height: 0; overflow-y: auto; padding: 20px; }
+.chat-transcript { min-height: 0; overflow-y: auto; padding: 22px; }
 
 @media (max-width: 900px) {
-  .chat-workspace { min-height: calc(100vh - 150px); }
+  .chat-workspace { min-height: calc(100vh - 150px); border-radius: var(--radius-md); }
   .workspace-header { align-items: flex-start; flex-direction: column; }
 }
 </style>

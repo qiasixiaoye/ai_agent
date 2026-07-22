@@ -1,31 +1,31 @@
 <template>
   <section class="workspace">
     <header class="workspace-header">
-      <div><h1>Workflow</h1><p class="muted">Generate a Dify-ready workflow from a requirement, then run and inspect it without leaving the workbench.</p></div>
+      <div><h1>工作流</h1><p class="muted">把一句需求转成可导入 Dify 的流程，并在工作台内运行和观测。</p></div>
     </header>
     <p v-if="error" class="status-error">{{ error }}</p>
     <div class="workspace-grid">
-      <WorkbenchSection title="Generate workflow" class="panel">
-        <label for="workflow-requirement">Requirement</label>
-        <textarea id="workflow-requirement" v-model="requirement" rows="7" placeholder="Describe the workflow outcome, inputs, and tools it should use." />
-        <div class="options"><label><span>Execution style</span><select v-model="mode"><option value="http">HTTP steps</option><option value="agent">Agent orchestration</option></select></label><label><span>Application type</span><select v-model="appKind"><option value="chatflow">Chatflow</option><option value="workflow">Workflow</option></select></label></div>
-        <button type="button" :disabled="generating || !requirement.trim()" @click="generate">{{ generating ? 'Generating...' : 'Generate workflow' }}</button>
+      <WorkbenchSection title="生成工作流" class="panel">
+        <label for="workflow-requirement">需求描述</label>
+        <textarea id="workflow-requirement" v-model="requirement" rows="7" placeholder="描述目标、输入、需要用到的工具和期望输出。" />
+        <div class="options"><label><span>执行方式</span><select v-model="mode"><option value="http">固定 HTTP 步骤</option><option value="agent">Agent 自主编排</option></select></label><label><span>应用类型</span><select v-model="appKind"><option value="chatflow">多轮对话</option><option value="workflow">单次流程</option></select></label></div>
+        <button type="button" :disabled="generating || !requirement.trim()" @click="generate">{{ generating ? '生成中…' : '生成工作流' }}</button>
       </WorkbenchSection>
-      <WorkbenchSection title="Generated workflow" class="panel">
-        <p v-if="!generated" class="muted">Generated workflow details will appear here.</p>
+      <WorkbenchSection title="生成结果" class="panel">
+        <p v-if="!generated" class="muted">生成后的节点、校验结果和导入入口会显示在这里。</p>
         <template v-else>
-          <div class="result-heading"><strong>{{ generated.workflowName || 'Untitled workflow' }}</strong><span :class="generated.valid === false ? 'status-error' : 'status-success'">{{ generated.valid === false ? 'Validation failed' : 'Ready for export' }}</span></div>
+          <div class="result-heading"><strong>{{ generated.workflowName || '未命名工作流' }}</strong><span :class="generated.valid === false ? 'status-error' : 'status-success'">{{ generated.valid === false ? '校验失败' : '可导出' }}</span></div>
           <p v-if="generated.warnings?.length" class="muted">{{ generated.warnings.join(' · ') }}</p>
           <div class="nodes"><span v-for="node in nodes" :key="node.id || node.type" class="node">{{ node.title || node.label || node.type }}</span></div>
-          <div class="actions"><a :href="exportUrl" target="_blank" rel="noopener">Download Dify DSL</a><button type="button" :disabled="runningGenerated" @click="runGenerated">{{ runningGenerated ? 'Running...' : 'Run generated workflow' }}</button><button type="button" :disabled="importing || generated.valid === false" @click="importToDify">{{ importing ? 'Importing...' : 'Import to Dify' }}</button></div>
-          <p v-if="importResult" :class="importResult.success === false ? 'status-error' : 'status-success'">{{ importResult.success === false ? importResult.errorMessage || 'Dify import failed.' : 'Imported to Dify.' }}</p>
-          <a v-if="difyAppUrl" :href="difyAppUrl" target="_blank" rel="noopener">Open imported workflow in Dify</a>
+          <div class="actions"><a :href="exportUrl" target="_blank" rel="noopener">下载 Dify DSL</a><button type="button" :disabled="runningGenerated" @click="runGenerated">{{ runningGenerated ? '运行中…' : '试运行' }}</button><button type="button" :disabled="importing || generated.valid === false" @click="importToDify">{{ importing ? '导入中…' : '导入 Dify' }}</button></div>
+          <p v-if="importResult" :class="importResult.success === false ? 'status-error' : 'status-success'">{{ importResult.success === false ? importResult.errorMessage || 'Dify 导入失败。' : '已导入 Dify。' }}</p>
+          <a v-if="difyAppUrl" :href="difyAppUrl" target="_blank" rel="noopener">在 Dify 打开</a>
         </template>
       </WorkbenchSection>
     </div>
-    <WorkbenchSection v-if="generatedRun || observation || importResult?.appId" title="Run results" class="panel result-panel">
-      <div v-if="generatedRun"><h3>Generated workflow run</h3><pre>{{ pretty(generatedRun) }}</pre></div>
-      <div v-if="importResult?.appId"><h3>Dify run observation</h3><button type="button" :disabled="observing" @click="observeRun">{{ observing ? 'Observing...' : 'Run and observe in Dify' }}</button><pre v-if="observation">{{ pretty(observation) }}</pre></div>
+    <WorkbenchSection v-if="generatedRun || observation || importResult?.appId" title="运行结果" class="panel result-panel">
+      <div v-if="generatedRun"><h3>本地试运行</h3><pre>{{ pretty(generatedRun) }}</pre></div>
+      <div v-if="importResult?.appId"><h3>Dify 运行观测</h3><button type="button" :disabled="observing" @click="observeRun">{{ observing ? '观测中…' : '在 Dify 运行并观测' }}</button><pre v-if="observation">{{ pretty(observation) }}</pre></div>
     </WorkbenchSection>
   </section>
 </template>
@@ -53,10 +53,10 @@ const exportUrl = computed(() => generated.value?.workflowId ? exportWorkflowDsl
 const difyAppUrl = computed(() => importResult.value?.appId ? `${import.meta.env.VITE_DIFY_CONSOLE_URL || 'http://localhost:3001'}/app/${importResult.value.appId}/workflow` : '')
 const pretty = (value) => JSON.stringify(value, null, 2)
 const capture = async (operation, fallback) => { error.value = ''; try { return await operation() } catch (cause) { error.value = cause?.message || fallback; return null } }
-const generate = async () => { generating.value = true; generated.value = null; generatedAppKind.value = null; generatedRun.value = null; importResult.value = null; observation.value = null; try { const result = await capture(() => generateWorkflowFromRequirement(requirement.value.trim(), mode.value, appKind.value), 'Workflow generation failed.'); generated.value = result; if (result) generatedAppKind.value = appKind.value } finally { generating.value = false } }
-const runGenerated = async () => { runningGenerated.value = true; try { generatedRun.value = await capture(() => runGeneratedWorkflow(generated.value.ir, requirement.value.trim()), 'Generated workflow run failed.') } finally { runningGenerated.value = false } }
-const importToDify = async () => { importing.value = true; observation.value = null; try { importResult.value = await capture(() => importGeneratedWorkflowToDify(generated.value.workflowId), 'Dify import failed.') } finally { importing.value = false } }
-const observeRun = async () => { observing.value = true; try { observation.value = await capture(() => runImportedDifyApp(importResult.value.appId, generatedAppKind.value, requirement.value.trim()), 'Dify run observation failed.') } finally { observing.value = false } }
+const generate = async () => { generating.value = true; generated.value = null; generatedAppKind.value = null; generatedRun.value = null; importResult.value = null; observation.value = null; try { const result = await capture(() => generateWorkflowFromRequirement(requirement.value.trim(), mode.value, appKind.value), '工作流生成失败。'); generated.value = result; if (result) generatedAppKind.value = appKind.value } finally { generating.value = false } }
+const runGenerated = async () => { runningGenerated.value = true; try { generatedRun.value = await capture(() => runGeneratedWorkflow(generated.value.ir, requirement.value.trim()), '试运行失败。') } finally { runningGenerated.value = false } }
+const importToDify = async () => { importing.value = true; observation.value = null; try { importResult.value = await capture(() => importGeneratedWorkflowToDify(generated.value.workflowId), 'Dify 导入失败。') } finally { importing.value = false } }
+const observeRun = async () => { observing.value = true; try { observation.value = await capture(() => runImportedDifyApp(importResult.value.appId, generatedAppKind.value, requirement.value.trim()), 'Dify 运行观测失败。') } finally { observing.value = false } }
 </script>
 
 <style scoped>
