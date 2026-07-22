@@ -34,6 +34,7 @@ import SegmentedControl from '../../components/workbench/SegmentedControl.vue'
 import { useChatStore } from '../../stores/chat'
 import { useMemoryStore } from '../../stores/memory'
 import { useWorkbenchStore } from '../../stores/workbench'
+import { streamClosureStatus } from '../../utils/streamLifecycle'
 import {
   connectToAssistantAppChat,
   connectToAssistantAppRagChat,
@@ -157,7 +158,10 @@ const sendMessage = (message) => {
           details: 'The assistant stream could not be opened or was interrupted.'
         })
       }
-      finalize(assistantMessageAdded ? 'incomplete' : 'error')
+      // EventSource reports a normal server-side EOF as `error`; a response that
+      // has already streamed is therefore complete unless the server sent an
+      // explicit application-level failure before any content.
+      finalize(streamClosureStatus(aiResponse))
     }
   } catch {
     loading.value = false
