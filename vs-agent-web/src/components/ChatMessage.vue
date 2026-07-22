@@ -44,12 +44,53 @@ const escapeHtml = (value) => value
   .replaceAll('"', '&quot;')
   .replaceAll("'", '&#39;')
 
-const sanitizeHtml = (html) => html
-  .replace(/<(script|style|iframe|object|embed)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
-  .replace(/<(script|style|iframe|object|embed)\b[^>]*\/?\s*>/gi, '')
-  .replace(/\son\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-  .replace(/\s(href|src|xlink:href)\s*=\s*(["'])\s*javascript:[\s\S]*?\2/gi, ' $1="#"')
-  .replace(/\s(href|src|xlink:href)\s*=\s*javascript:[^\s>]+/gi, ' $1="#"')
+const allowedTags = new Set([
+  'p', 'br', 'strong', 'em', 'b', 'i', 'code', 'pre', 'ul', 'ol', 'li',
+  'blockquote', 'a', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'del',
+  'table', 'thead', 'tbody', 'tr', 'th', 'td'
+])
+const allowedAttributes = { a: new Set(['href', 'title']) }
+const discardTags = new Set(['script', 'style', 'iframe', 'object', 'embed'])
+
+const isSafeHref = (value) => {
+  const normalized = value.trim().replace(/[\u0000-\u001f\u007f\s]/g, '')
+  if (!normalized || normalized.startsWith('#') || normalized.startsWith('?')) return true
+  if (normalized.startsWith('/') && !normalized.startsWith('//')) return true
+  if (normalized.startsWith('./') || normalized.startsWith('../')) return true
+  if (/^(?![a-z][a-z0-9+.-]*:)(?!\/\/)/i.test(normalized)) return true
+
+  try {
+    return ['http:', 'https:', 'mailto:'].includes(new URL(normalized).protocol)
+  } catch {
+    return false
+  }
+}
+
+const sanitizeHtml = (html) => {
+  const document = new DOMParser().parseFromString(html, 'text/html')
+
+  for (const element of Array.from(document.body.querySelectorAll('*'))) {
+    if (!element.parentNode) continue
+
+    const tag = element.tagName.toLowerCase()
+    if (!allowedTags.has(tag)) {
+      if (discardTags.has(tag)) element.remove()
+      else element.replaceWith(...element.childNodes)
+      continue
+    }
+
+    const allowed = allowedAttributes[tag] || new Set()
+    for (const attribute of Array.from(element.attributes)) {
+      if (!allowed.has(attribute.name.toLowerCase())) element.removeAttribute(attribute.name)
+    }
+
+    if (tag === 'a' && !isSafeHref(element.getAttribute('href') || '')) {
+      element.removeAttribute('href')
+    }
+  }
+
+  return document.body.innerHTML
+}
 
 const formattedMessage = computed(() => {
   return props.isUser ? escapeHtml(props.content) : sanitizeHtml(marked(props.content))

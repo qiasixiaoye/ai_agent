@@ -83,7 +83,7 @@ const onSubmit = () => {
 
 .send-button:hover {
   filter: brightness(1.1);
-  box-shadow: var(--glow-cyan);
+  box-shadow: var(--shadow-focus);
 }
 
 .send-button:disabled {
