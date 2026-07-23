@@ -32,4 +32,21 @@ class RequestOrchestratorTest {
         assertEquals("案", events.get(3).payload().get("text"));
         assertFalse(events.get(4).payload().containsKey("rawToolOutput"));
     }
+
+    @Test
+    void marksKnowledgeRetrievalAsTypedLifecycleEvents() {
+        AssistantApp assistantApp = mock(AssistantApp.class);
+        when(assistantApp.doChatWithRagSse("从知识库检索 Agent 工具治理", "conversation-2"))
+                .thenReturn(Flux.just("知识", "结果"));
+        RequestOrchestrator orchestrator = new RequestOrchestrator(assistantApp, new CapabilityRouter());
+
+        List<String> types = orchestrator.stream(new OrchestrationRequest(
+                        "conversation-2", "从知识库检索 Agent 工具治理", null, "request-2", "trace-2"))
+                .map(event -> event.data().type())
+                .collectList()
+                .block();
+
+        assertEquals(List.of("request_started", "route_selected", "retrieval_started",
+                "final_delta", "final_delta", "retrieval_completed", "final_completed"), types);
+    }
 }

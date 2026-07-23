@@ -60,6 +60,9 @@ public class RequestOrchestrator {
                 || plan.route() == RoutePlan.Route.MIXED) {
             prefix = prefix.concatWithValues(event("capability_started", conversationId, requestId, traceId,
                     Map.of("route", plan.route().name())));
+        } else if (plan.route() == RoutePlan.Route.KNOWLEDGE) {
+            prefix = prefix.concatWithValues(event("retrieval_started", conversationId, requestId, traceId,
+                    Map.of("route", plan.route().name())));
         }
 
         return prefix.concatWith(answer
@@ -68,6 +71,10 @@ public class RequestOrchestrator {
                         .concatWith((plan.route() == RoutePlan.Route.TOOL || plan.route() == RoutePlan.Route.SKILL
                                 || plan.route() == RoutePlan.Route.MIXED)
                                 ? Mono.just(event("capability_completed", conversationId, requestId, traceId,
+                                Map.of("status", "success")))
+                                : Mono.empty())
+                        .concatWith(plan.route() == RoutePlan.Route.KNOWLEDGE
+                                ? Mono.just(event("retrieval_completed", conversationId, requestId, traceId,
                                 Map.of("status", "success")))
                                 : Mono.empty())
                         .concatWith(Flux.defer(() -> finalization(
