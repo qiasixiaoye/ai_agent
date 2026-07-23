@@ -65,13 +65,13 @@ public class RequestOrchestrator {
         return prefix.concatWith(answer
                         .map(text -> event("final_delta", conversationId, requestId, traceId,
                                 Map.of("text", append(finalAnswer, text))))
-                        .concatWith(Flux.defer(() -> finalization(
-                                conversationId, requestId, traceId, message, finalAnswer.toString())))
                         .concatWith((plan.route() == RoutePlan.Route.TOOL || plan.route() == RoutePlan.Route.SKILL
                                 || plan.route() == RoutePlan.Route.MIXED)
                                 ? Mono.just(event("capability_completed", conversationId, requestId, traceId,
                                 Map.of("status", "success")))
                                 : Mono.empty())
+                        .concatWith(Flux.defer(() -> finalization(
+                                conversationId, requestId, traceId, message, finalAnswer.toString())))
                         .onErrorResume(error -> Flux.just(event("request_failed", conversationId, requestId, traceId,
                                 Map.of("message", safeMessage(error))))));
     }
