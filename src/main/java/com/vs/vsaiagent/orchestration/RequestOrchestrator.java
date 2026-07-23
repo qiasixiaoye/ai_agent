@@ -1,6 +1,9 @@
 package com.vs.vsaiagent.orchestration;
 
 import com.vs.vsaiagent.app.AssistantApp;
+import com.vs.vsaiagent.memory.MemoryCandidate;
+import com.vs.vsaiagent.memory.MemoryCandidatePipeline;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
@@ -8,6 +11,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -17,10 +21,18 @@ public class RequestOrchestrator {
 
     private final AssistantApp assistantApp;
     private final CapabilityRouter capabilityRouter;
+    private final MemoryCandidatePipeline memoryCandidatePipeline;
 
     public RequestOrchestrator(AssistantApp assistantApp, CapabilityRouter capabilityRouter) {
+        this(assistantApp, capabilityRouter, null);
+    }
+
+    @Autowired
+    public RequestOrchestrator(AssistantApp assistantApp, CapabilityRouter capabilityRouter,
+                               MemoryCandidatePipeline memoryCandidatePipeline) {
         this.assistantApp = assistantApp;
         this.capabilityRouter = capabilityRouter;
+        this.memoryCandidatePipeline = memoryCandidatePipeline;
     }
 
     public Flux<ServerSentEvent<OrchestrationEvent>> stream(OrchestrationRequest request) {
@@ -35,6 +47,7 @@ public class RequestOrchestrator {
         }
 
         RoutePlan plan = capabilityRouter.route(message);
+        StringBuilder finalAnswer = new StringBuilder();
         Flux<ServerSentEvent<OrchestrationEvent>> prefix = Flux.just(
                 event("request_started", conversationId, requestId, traceId,
                         Map.of("messageLength", message.length())),
@@ -50,9 +63,9 @@ public class RequestOrchestrator {
 
         return prefix.concatWith(answer
                         .map(text -> event("final_delta", conversationId, requestId, traceId,
-                                Map.of("text", text == null ? "" : text)))
-                        .concatWith(Mono.fromSupplier(() -> event("final_completed", conversationId, requestId,
-                                traceId, Map.of("status", "success"))))
+                                Map.of("text", append(finalAnswer, text))))
+                        .concatWith(Mono.fromSupplier(() -> finalCompleted(
+                                conversationId, requestId, traceId, message, finalAnswer.toString())))
                         .concatWith((plan.route() == RoutePlan.Route.TOOL || plan.route() == RoutePlan.Route.SKILL
                                 || plan.route() == RoutePlan.Route.MIXED)
                                 ? Mono.just(event("capability_completed", conversationId, requestId, traceId,
@@ -60,6 +73,26 @@ public class RequestOrchestrator {
                                 : Mono.empty())
                         .onErrorResume(error -> Flux.just(event("request_failed", conversationId, requestId, traceId,
                                 Map.of("message", safeMessage(error))))));
+    }
+
+    private String append(StringBuilder output, String text) {
+        String safe = text == null ? "" : text;
+        output.append(safe);
+        return safe;
+    }
+
+    private ServerSentEvent<OrchestrationEvent> finalCompleted(String conversationId, String requestId,
+                                                                String traceId, String userMessage,
+                                                                String finalAnswer) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("status", "success");
+        if (memoryCandidatePipeline != null) {
+            List<MemoryCandidate> candidates = memoryCandidatePipeline.onTurnCompleted(
+                    new MemoryCandidatePipeline.CompletedTurn(conversationId, userMessage, finalAnswer, List.of()));
+            payload.put("memoryCandidateCount", candidates.size());
+            payload.put("memoryCandidateStatus", candidates.stream().map(MemoryCandidate::status).toList());
+        }
+        return event("final_completed", conversationId, requestId, traceId, payload);
     }
 
     private Flux<String> answerFor(RoutePlan.Route route, String message, String conversationId) {

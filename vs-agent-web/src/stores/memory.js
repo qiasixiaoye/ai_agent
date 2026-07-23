@@ -16,6 +16,7 @@ export const useMemoryStore = defineStore('memory', {
     contextPreview: null,
     diagnostics: null,
     suggestion: null,
+    memoryStatus: 'idle',
     autoWriteEnabled: false,
     loading: false,
     writing: false,
@@ -55,14 +56,22 @@ export const useMemoryStore = defineStore('memory', {
       }
     },
     suggestMemory({ userMessage, assistantMessage }) {
-      const user = String(userMessage || '').trim()
-      const assistant = String(assistantMessage || '').trim()
-      if (!user || !assistant || assistant.length < 80) return
-      this.suggestion = {
-        content: `用户问题：${user}\n可复用回答摘要：${assistant.slice(0, 600)}`,
-        importance: 0.8,
-        status: 'pending'
+      // 候选记忆只接受后端 final_completed 事件，避免原始 Tool 输出进入长期记忆。
+      return { userMessage, assistantMessage }
+    },
+    consumeCandidate(candidate) {
+      if (!candidate) {
+        this.memoryStatus = 'none'
+        return
       }
+      this.suggestion = {
+        content: String(candidate.content || ''),
+        importance: Number(candidate.importance ?? 0.8),
+        status: candidate.status || 'pending',
+        type: candidate.type || 'semantic',
+        confidence: Number(candidate.confidence ?? 0)
+      }
+      this.memoryStatus = this.suggestion.status === 'written' ? 'written' : 'pending'
     },
     updateSuggestion({ content, importance }) {
       this.suggestion = {
@@ -77,11 +86,13 @@ export const useMemoryStore = defineStore('memory', {
       try {
         const result = await addSemanticMemory(conversationId, this.suggestion.content, this.suggestion.importance)
         this.suggestion.status = 'written'
+        this.memoryStatus = 'written'
         this.error = ''
         await this.loadConversation(conversationId)
         return result
       } catch (error) {
         this.suggestion.status = 'failed'
+        this.memoryStatus = 'failed'
         this.error = messageOf(error)
         throw error
       } finally {
@@ -110,6 +121,7 @@ export const useMemoryStore = defineStore('memory', {
       this.contextPreview = null
       this.diagnostics = null
       this.suggestion = null
+      this.memoryStatus = 'idle'
     }
   }
 })
