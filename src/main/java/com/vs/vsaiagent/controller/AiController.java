@@ -2,6 +2,8 @@ package com.vs.vsaiagent.controller;
 
 import com.vs.vsaiagent.agent.VsManus;
 import com.vs.vsaiagent.app.AssistantApp;
+import com.vs.vsaiagent.orchestration.OrchestrationRequest;
+import com.vs.vsaiagent.orchestration.RequestOrchestrator;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,6 +12,8 @@ import org.springframework.ai.tool.ToolCallback;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -30,6 +34,23 @@ public class AiController {
 
     @Autowired
     private ChatModel chatModel;
+
+    @Resource
+    private RequestOrchestrator requestOrchestrator;
+
+    @PostMapping(value = "/orchestrate/stream", consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ServerSentEvent<com.vs.vsaiagent.orchestration.OrchestrationEvent>> orchestrate(
+            @RequestBody OrchestrationRequest request) {
+        return requestOrchestrator.stream(request);
+    }
+
+    @GetMapping(value = "/orchestrate/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ServerSentEvent<com.vs.vsaiagent.orchestration.OrchestrationEvent>> orchestrateGet(
+            String message, String conversationId, String requestId, String traceId) {
+        return requestOrchestrator.stream(new OrchestrationRequest(
+                conversationId, message, null, requestId, traceId));
+    }
 
     @GetMapping("/assistant_app/chat/sync")
     public String doChatWithAppSync(String message, String chatId) {
