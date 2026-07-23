@@ -10,6 +10,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -64,7 +65,7 @@ public class RequestOrchestrator {
         return prefix.concatWith(answer
                         .map(text -> event("final_delta", conversationId, requestId, traceId,
                                 Map.of("text", append(finalAnswer, text))))
-                        .concatWith(Mono.fromSupplier(() -> finalCompleted(
+                        .concatWith(Flux.defer(() -> finalization(
                                 conversationId, requestId, traceId, message, finalAnswer.toString())))
                         .concatWith((plan.route() == RoutePlan.Route.TOOL || plan.route() == RoutePlan.Route.SKILL
                                 || plan.route() == RoutePlan.Route.MIXED)
@@ -81,18 +82,25 @@ public class RequestOrchestrator {
         return safe;
     }
 
-    private ServerSentEvent<OrchestrationEvent> finalCompleted(String conversationId, String requestId,
-                                                                String traceId, String userMessage,
-                                                                String finalAnswer) {
+    private Flux<ServerSentEvent<OrchestrationEvent>> finalization(String conversationId, String requestId,
+                                                                    String traceId, String userMessage,
+                                                                    String finalAnswer) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("status", "success");
+        List<ServerSentEvent<OrchestrationEvent>> events = new ArrayList<>();
+        List<MemoryCandidate> candidates = List.of();
         if (memoryCandidatePipeline != null) {
-            List<MemoryCandidate> candidates = memoryCandidatePipeline.onTurnCompleted(
+            candidates = memoryCandidatePipeline.onTurnCompleted(
                     new MemoryCandidatePipeline.CompletedTurn(conversationId, userMessage, finalAnswer, List.of()));
             payload.put("memoryCandidateCount", candidates.size());
             payload.put("memoryCandidateStatus", candidates.stream().map(MemoryCandidate::status).toList());
         }
-        return event("final_completed", conversationId, requestId, traceId, payload);
+        events.add(event("final_completed", conversationId, requestId, traceId, payload));
+        for (MemoryCandidate candidate : candidates) {
+            events.add(event("memory_candidate", conversationId, requestId, traceId,
+                    Map.of("candidate", candidate)));
+        }
+        return Flux.fromIterable(events);
     }
 
     private Flux<String> answerFor(RoutePlan.Route route, String message, String conversationId) {

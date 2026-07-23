@@ -5,7 +5,7 @@
         <h1>AI 对话</h1>
         <p class="muted">普通对话、知识库问答和智能体模式共用同一个上下文。</p>
       </div>
-      <SegmentedControl v-model="mode" :options="modeOptions" />
+      <span class="auto-route-badge">自动编排 · 按问题选择能力</span>
     </header>
 
     <div class="chat-body">
@@ -65,7 +65,7 @@
           />
           <div v-if="!messages.length" class="empty-transcript">
             <strong>这是一个空会话</strong>
-            <span>输入问题开始对话，Tool、Skill 和记忆能力仍按原流程触发。</span>
+            <span>输入问题即可开始。系统会自动判断是否需要知识检索、Tool 或 Skill。</span>
           </div>
           <LoadingIndicator v-if="loading" />
         </div>
@@ -81,27 +81,19 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import ChatInput from '../../components/ChatInput.vue'
 import ChatMessage from '../../components/ChatMessage.vue'
 import LoadingIndicator from '../../components/LoadingIndicator.vue'
-import SegmentedControl from '../../components/workbench/SegmentedControl.vue'
 import { useChatStore } from '../../stores/chat'
 import { useMemoryStore } from '../../stores/memory'
 import { useWorkbenchStore } from '../../stores/workbench'
-import { streamClosureStatus } from '../../utils/streamLifecycle'
 import { resolveChatSession } from '../../utils/chatSession'
-import {
-  connectToAssistantAppChat,
-  connectToAssistantAppRagChat,
-  connectToManusChat
-} from '../../services/api'
+import { connectToOrchestrator } from '../../services/api'
 
 const modeOptions = [
   { value: 'normal', label: '普通对话' },
   { value: 'rag', label: '知识库' },
   { value: 'agent', label: '智能体' }
 ]
-
 const categoryOptions = modeOptions
-const WELCOME_MESSAGE = '你好，我可以帮你对话、查知识库，或切换到智能体模式执行任务。'
-
+const WELCOME_MESSAGE = '你好，我会根据你的问题自动选择直接回答、知识检索、Tool 或 Skill。'
 const chatStore = useChatStore()
 const memoryStore = useMemoryStore()
 const workbench = useWorkbenchStore()
@@ -111,8 +103,6 @@ const loading = ref(false)
 const eventSource = ref(null)
 const messagesContainer = ref(null)
 const lastUserMessage = ref('')
-let agentHistory = []
-
 const messages = computed(() => chatStore.assistantAppChats[chatId.value]?.messages || [])
 const conversations = computed(() => Object.values(chatStore.assistantAppChats)
   .sort((left, right) => Number(Boolean(right.pinned)) - Number(Boolean(left.pinned))
@@ -132,66 +122,45 @@ const conversationGroups = computed(() => {
 })
 
 watch(mode, (value) => workbench.setMode(value), { immediate: true })
-
 onMounted(() => {
-  chatId.value = resolveChatSession({
-    chatStore,
-    workbench,
-    welcomeMessage: WELCOME_MESSAGE
-  }).chatId
-  if (mode.value === 'agent') rebuildAgentHistory()
+  chatId.value = resolveChatSession({ chatStore, workbench, welcomeMessage: WELCOME_MESSAGE }).chatId
 })
-
 const categoryLabel = (category) => categoryOptions.find((option) => option.value === category)?.label || '普通对话'
-
 const formatUpdatedAt = (value) => {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '刚刚'
   return date.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
-
 const createNewConversation = () => {
   if (loading.value) return
   const newChatId = chatStore.createConversation(mode.value, { category: mode.value })
   chatStore.addMessage(newChatId, { content: WELCOME_MESSAGE, isUser: false, mode: mode.value, status: 'complete' })
   chatId.value = newChatId
   workbench.setConversation(newChatId)
-  agentHistory = []
   scrollToBottom()
 }
-
 const selectConversation = (conversation) => {
   if (loading.value || !conversation?.id) return
   chatId.value = conversation.id
   workbench.setConversation(conversation.id)
   mode.value = conversation.mode || 'normal'
-  if (mode.value === 'agent') rebuildAgentHistory()
-  else agentHistory = []
   scrollToBottom()
 }
-
 const renameCurrentConversation = () => {
   if (!currentConversation.value) return
   const title = window.prompt('输入会话名称', currentConversation.value.title || '')
   if (title?.trim()) chatStore.updateConversation(chatId.value, { title })
 }
-
 const updateCurrentCategory = (category) => {
   if (currentConversation.value) chatStore.updateConversation(chatId.value, { category })
 }
-
 const toggleCurrentPin = () => {
   if (currentConversation.value) chatStore.updateConversation(chatId.value, { pinned: !currentConversation.value.pinned })
 }
-
 const clearCurrentConversation = () => {
   if (!currentConversation.value || loading.value) return
-  if (window.confirm('清空当前会话中的消息？会话名称和分类会保留。')) {
-    chatStore.clearConversation(chatId.value)
-    agentHistory = []
-  }
+  if (window.confirm('清空当前会话中的消息？会话名称和分类会保留。')) chatStore.clearConversation(chatId.value)
 }
-
 const deleteCurrentConversation = () => {
   if (!currentConversation.value || loading.value) return
   if (!window.confirm('删除当前会话？该本地记录无法恢复。')) return
@@ -199,113 +168,111 @@ const deleteCurrentConversation = () => {
   const nextSession = resolveChatSession({ chatStore, workbench, welcomeMessage: WELCOME_MESSAGE })
   chatId.value = nextSession.chatId
   mode.value = chatStore.assistantAppChats[chatId.value]?.mode || 'normal'
-  agentHistory = []
   scrollToBottom()
 }
-
 onUnmounted(() => eventSource.value?.close())
-
 const scrollToBottom = async () => {
   await nextTick()
   if (messagesContainer.value) messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
 }
 
-const rebuildAgentHistory = () => {
-  agentHistory = messages.value
-    .filter((message) => message.content)
-    .map((message) => message.isUser ? { user: message.content } : { assistant: message.content })
-}
-
-const openConnection = (message, requestMode) => {
-  if (requestMode === 'rag') return connectToAssistantAppRagChat(message, chatId.value)
-  if (requestMode === 'agent') {
-    agentHistory.push({ user: message })
-    return connectToManusChat(message, JSON.stringify(agentHistory))
-  }
-  return connectToAssistantAppChat(message, chatId.value)
-}
-
 const sendMessage = (message) => {
   if (loading.value) return
-
   const requestMode = mode.value
   lastUserMessage.value = message
   chatStore.addMessage(chatId.value, { content: message, isUser: true, mode: requestMode })
   loading.value = true
   scrollToBottom()
-
   try {
     eventSource.value?.close()
-    const source = openConnection(message, requestMode)
+    const source = connectToOrchestrator(message, chatId.value)
     eventSource.value = source
     let aiResponse = ''
     let assistantMessageAdded = false
     let finalized = false
-
-    const finalize = (status = aiResponse ? 'complete' : 'incomplete') => {
-      if (finalized) return
-      finalized = true
-      source.close()
-      if (eventSource.value === source) eventSource.value = null
-      chatStore.updateLastAssistantMessage(chatId.value, { status })
-      if (requestMode === 'agent' && aiResponse) agentHistory.push({ assistant: aiResponse })
-      memoryStore.suggestMemory({ userMessage: lastUserMessage.value, assistantMessage: aiResponse })
-      workbench.addInvocation({
-        source: requestMode,
-        name: '对话',
-        status: aiResponse ? 'complete' : 'incomplete',
-        summary: lastUserMessage.value.slice(0, 120)
-      })
-      loading.value = false
-      scrollToBottom()
+    let finalEventReceived = false
+    let expectedCandidates = 0
+    let receivedCandidates = 0
+    const executionSummary = []
+    const parseEvent = (event) => {
+      try {
+        const value = JSON.parse(event.data || '{}')
+        return { payload: value.payload || {}, event: value }
+      } catch {
+        return { payload: {}, event: {} }
+      }
     }
-
-    source.onmessage = (event) => {
-      if (!event.data) return
-      aiResponse += event.data
+    const updateDetails = () => {
+      if (assistantMessageAdded) chatStore.updateLastAssistantMessage(chatId.value, { details: executionSummary })
+    }
+    const appendDelta = (text) => {
+      if (!text) return
+      aiResponse += text
       if (!assistantMessageAdded) {
-        chatStore.addMessage(chatId.value, {
-          content: aiResponse,
-          isUser: false,
-          mode: requestMode,
-          status: 'streaming'
-        })
+        chatStore.addMessage(chatId.value, { content: aiResponse, isUser: false, mode: requestMode, status: 'streaming' })
         assistantMessageAdded = true
       } else {
         chatStore.updateLastAssistantMessage(chatId.value, { content: aiResponse, status: 'streaming' })
       }
       scrollToBottom()
     }
-
-    source.addEventListener('complete', () => finalize())
-    source.onerror = () => {
-      if (!assistantMessageAdded) {
-        chatStore.addMessage(chatId.value, {
-          content: '无法连接到对话服务，请确认后端容器已启动后重试。',
-          isUser: false,
-          mode: requestMode,
-          status: 'error',
-          details: '后端对话流未能打开，或连接被中断。'
-        })
+    const finalize = (status = aiResponse ? 'complete' : 'incomplete') => {
+      if (finalized) return
+      finalized = true
+      source.close()
+      if (eventSource.value === source) eventSource.value = null
+      chatStore.updateLastAssistantMessage(chatId.value, { status })
+      workbench.addInvocation({ source: 'auto', name: '自动编排', status, summary: executionSummary.map((item) => item.label).join(' · ') || '直接回答' })
+      loading.value = false
+      scrollToBottom()
+    }
+    source.addEventListener('route_selected', (event) => {
+      const { payload } = parseEvent(event)
+      executionSummary.push({ type: 'route', label: payload.route === 'DIRECT' ? '直接回答' : `自动选择 ${payload.route || '能力'}` })
+      updateDetails()
+    })
+    ;['retrieval_completed', 'capability_started', 'capability_completed'].forEach((eventName) => {
+      source.addEventListener(eventName, (event) => {
+        const { payload } = parseEvent(event)
+        const labels = { retrieval_completed: payload.status === 'empty' ? '知识检索无匹配' : '已检索知识库', capability_started: '正在调用能力', capability_completed: '能力调用完成' }
+        executionSummary.push({ type: eventName, label: labels[eventName] })
+        updateDetails()
+      })
+    })
+    source.addEventListener('final_delta', (event) => appendDelta(parseEvent(event).payload.text))
+    source.addEventListener('final_completed', (event) => {
+      const { payload } = parseEvent(event)
+      finalEventReceived = true
+      expectedCandidates = Number(payload.memoryCandidateCount || 0)
+      if (!expectedCandidates) {
+        memoryStore.consumeCandidate(null)
+        finalize()
       }
-      finalize(streamClosureStatus(aiResponse))
+    })
+    source.addEventListener('memory_candidate', (event) => {
+      receivedCandidates += 1
+      memoryStore.consumeCandidate(parseEvent(event).payload.candidate || parseEvent(event).payload)
+      if (finalEventReceived && receivedCandidates >= expectedCandidates) finalize()
+    })
+    source.addEventListener('request_failed', (event) => {
+      const { payload } = parseEvent(event)
+      if (!assistantMessageAdded) {
+        chatStore.addMessage(chatId.value, { content: payload.message || '请求执行失败，请稍后重试。', isUser: false, mode: requestMode, status: 'error' })
+        assistantMessageAdded = true
+      }
+      finalize('error')
+    })
+    source.onerror = () => {
+      if (!finalized && !assistantMessageAdded) {
+        chatStore.addMessage(chatId.value, { content: '无法连接到对话服务，请确认后端容器已启动后重试。', isUser: false, mode: requestMode, status: 'error', details: '后端对话流未能打开，或连接被中断。' })
+        assistantMessageAdded = true
+      }
+      if (!finalized) finalize(aiResponse ? 'complete' : 'incomplete')
     }
   } catch {
     loading.value = false
-    chatStore.addMessage(chatId.value, {
-      content: '无法启动对话，请确认后端容器已启动后重试。',
-      isUser: false,
-      mode: requestMode,
-      status: 'error',
-      details: '浏览器未能创建对话流。'
-    })
-    workbench.addInvocation({
-      source: requestMode,
-      operation: 'assistant-response',
-      mode: requestMode,
-      status: 'error',
-      summary: '对话流启动失败。'
-    })
+    chatStore.addMessage(chatId.value, { content: '无法启动对话，请确认后端容器已启动后重试。', isUser: false, mode: requestMode, status: 'error', details: '浏览器未能创建对话流。' })
+    workbench.addInvocation({ source: 'auto', operation: 'assistant-response', status: 'error', summary: '对话流启动失败。' })
     scrollToBottom()
   }
 }
@@ -325,6 +292,7 @@ const sendMessage = (message) => {
 .workspace-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 22px; border-bottom: 1px solid var(--color-border); }
 .workspace-header h1 { margin: 0 0 4px; font-size: 1.25rem; }
 .workspace-header p { margin: 0; }
+.auto-route-badge { padding: 7px 11px; color: var(--color-primary); border: 1px solid color-mix(in srgb, var(--color-primary) 38%, var(--color-border)); border-radius: 999px; background: color-mix(in srgb, var(--color-primary) 10%, transparent); font-size: .78rem; white-space: nowrap; }
 .conversation-actions, .conversation-actions > div { display: flex; align-items: center; gap: 8px; }
 .text-button, .danger-button { border: 1px solid var(--color-border); border-radius: 8px; padding: 8px 11px; font: inherit; cursor: pointer; }
 .text-button { background: transparent; color: var(--color-text); }

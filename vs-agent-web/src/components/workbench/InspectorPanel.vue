@@ -1,156 +1,68 @@
 <template>
-  <aside class="inspector-panel" aria-label="上下文检查器">
-    <WorkbenchSection title="当前会话">
-      <dl class="inspector-details">
-        <div><dt>会话</dt><dd>{{ conversationId || '尚未创建' }}</dd></div>
-        <div><dt>模式</dt><dd>{{ modeLabel }}</dd></div>
-        <div><dt>恢复</dt><dd>本地会话索引已启用</dd></div>
-      </dl>
-    </WorkbenchSection>
-
-    <WorkbenchSection title="长期记忆">
-      <p class="muted">{{ memoryBindingText }}</p>
-      <dl v-if="memory.conversation" class="inspector-details">
-        <div><dt>工作</dt><dd>{{ memory.conversation.workingMessageCount || 0 }} 条消息</dd></div>
-        <div><dt>摘要</dt><dd>{{ memory.conversation.rollingSummary ? '已生成' : '暂无' }}</dd></div>
-        <div><dt>语义</dt><dd>{{ (memory.conversation.semanticMemories || []).length }} 条</dd></div>
-        <div><dt>情景</dt><dd>{{ (memory.conversation.episodicMemories || []).length }} 条</dd></div>
-      </dl>
-    </WorkbenchSection>
-
-    <WorkbenchSection title="记忆建议">
-      <p class="muted">对话产生可复用信息时，会在这里生成候选记忆。确认后再写入长期记忆。</p>
-      <textarea id="memory-content" v-model="suggestionContent" rows="4" placeholder="暂无候选记忆"></textarea>
-      <button type="button" :disabled="!conversationId || !suggestionContent.trim() || memory.writing" @click="writeMemory">
-        {{ memory.writing ? '写入中…' : '写入记忆' }}
-      </button>
-      <p v-if="memory.suggestion?.status === 'failed'" class="status-error">{{ memory.error || '记忆写入失败。' }}</p>
-      <p v-else-if="memory.suggestion?.status === 'written'" class="status-success">记忆已写入。</p>
-    </WorkbenchSection>
-
-    <WorkbenchSection title="上下文预览">
-      <p class="muted">{{ previewQuery || '发送消息后可查看将进入模型的上下文摘要。' }}</p>
-      <button type="button" :disabled="!conversationId || !previewQuery || previewing" @click="previewContext">
-        {{ previewing ? '加载中…' : '预览上下文' }}
-      </button>
-      <dl v-if="memory.contextPreview" class="inspector-details">
-        <div><dt>预算</dt><dd>{{ memory.contextPreview.estimatedTokens }} / {{ memory.contextPreview.tokenBudget }}</dd></div>
-        <div><dt>层级</dt><dd>{{ (memory.contextPreview.includedTiers || []).join('、') || '无' }}</dd></div>
-      </dl>
-    </WorkbenchSection>
-
-    <WorkbenchSection title="权限摘要">
-      <p class="muted">能力中心会在高风险工具调用前要求确认。</p>
-      <dl class="inspector-details">
-        <div><dt>运行态</dt><dd>{{ statusLabel(runtime.status) }}</dd></div>
-        <div><dt>工具数</dt><dd>{{ runtime.tools.length }}</dd></div>
-      </dl>
-      <p v-if="runtime.unavailable" class="muted">当前环境未开启 MCP 治理接口。</p>
-    </WorkbenchSection>
-
-    <WorkbenchSection title="最近动作">
-      <p v-if="!workbench.recentInvocations.length" class="muted">暂无调用记录。</p>
-      <ul v-else class="invocation-list">
-        <li v-for="invocation in workbench.recentInvocations" :key="invocation.id">
-          <strong>{{ invocation.name || invocation.operation || invocation.source }}</strong>
-          <span>{{ statusLabel(invocation.status) }} · {{ invocation.summary }}</span>
+  <aside class="inspector-panel" aria-label="本轮运行概览">
+    <WorkbenchSection title="本轮执行">
+      <p class="summary-line">{{ executionText }}</p>
+      <ul v-if="recent.length" class="execution-list">
+        <li v-for="item in recent" :key="item.id">
+          <span class="status-dot" :class="item.status"></span>
+          <span>{{ item.name || item.operation || '自动编排' }}</span>
+          <small>{{ statusLabel(item.status) }}</small>
         </li>
       </ul>
+      <p v-else class="muted">发送问题后，这里会显示本轮实际使用的能力。</p>
+    </WorkbenchSection>
+
+    <WorkbenchSection title="记忆">
+      <p class="summary-line">{{ memoryText }}</p>
+      <p class="muted">只有完成轮次中的稳定、非敏感信息才会进入记忆候选。</p>
+      <button type="button" class="outline-button" @click="openMemory">管理 Memory</button>
+    </WorkbenchSection>
+
+    <WorkbenchSection title="可追溯性">
+      <p class="muted">Tool、Skill、知识检索和最终回答共享同一条 Trace。</p>
+      <button type="button" class="outline-button" @click="openObservability">查看 Trace</button>
     </WorkbenchSection>
   </aside>
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import WorkbenchSection from './WorkbenchSection.vue'
-import { useChatStore } from '../../stores/chat'
 import { useMemoryStore } from '../../stores/memory'
-import { useRuntimeStore } from '../../stores/runtime'
 import { useWorkbenchStore } from '../../stores/workbench'
 import { statusLabel } from '../../utils/productText'
 
-const chatStore = useChatStore()
+const router = useRouter()
 const memory = useMemoryStore()
-const runtime = useRuntimeStore()
 const workbench = useWorkbenchStore()
-const previewing = ref(false)
-const suggestionContent = ref('')
-
-const conversationId = computed(() => workbench.currentConversationId)
-const chatMessages = computed(() => chatStore.assistantAppChats[conversationId.value]?.messages || [])
-const lastUserMessage = computed(() => [...chatMessages.value].reverse().find((message) => message.isUser)?.content || '')
-const previewQuery = computed(() => lastUserMessage.value.trim())
-const modeLabel = computed(() => ({
-  normal: '普通对话',
-  rag: '知识库',
-  agent: '智能体'
-}[workbench.currentMode] || '普通对话'))
-const memoryBindingText = computed(() => {
-  if (!conversationId.value) return '尚未创建会话，无法绑定长期记忆。'
-  if (memory.loading) return '正在检查后端长期记忆。'
-  if (memory.error) return memory.error
-  if (!memory.conversation) return '尚未加载长期记忆快照。'
-  const semantic = (memory.conversation.semanticMemories || []).length
-  const episodic = (memory.conversation.episodicMemories || []).length
-  const working = memory.conversation.workingMessageCount || 0
-  const hasSummary = Boolean(memory.conversation.rollingSummary)
-  if (!working && !semantic && !episodic && !hasSummary) return '已连接后端记忆服务，当前会话暂无长期记忆。'
-  return '已绑定后端长期记忆，模型调用前会按预算召回相关摘要、语义和情景记忆。'
+const recent = computed(() => workbench.recentInvocations.slice(0, 4))
+const executionText = computed(() => {
+  const latest = recent.value[0]
+  if (!latest) return '等待下一次请求'
+  if (latest.status === 'complete') return latest.summary || '本轮已完成'
+  return statusLabel(latest.status)
 })
-
-watch(
-  () => memory.suggestion,
-  (suggestion) => {
-    suggestionContent.value = suggestion?.content || ''
-  },
-  { immediate: true, deep: true }
-)
-
-watch(conversationId, (id) => {
-  if (id) memory.loadConversation(id)
-}, { immediate: true })
-
-onMounted(() => {
-  runtime.loadHealth()
-  runtime.loadTools()
+const memoryText = computed(() => {
+  if (memory.memoryStatus === 'written') return '本轮已自动保存 1 条记忆，可在 Memory 中管理。'
+  if (memory.memoryStatus === 'pending') return '本轮有 1 条候选记忆等待确认。'
+  if (memory.memoryStatus === 'failed') return '记忆写入失败，不影响本轮回答。'
+  if (memory.memoryStatus === 'none') return '本轮未产生可写入的长期记忆。'
+  return '等待本轮回答完成后评估。'
 })
-
-const writeMemory = async () => {
-  memory.updateSuggestion({ content: suggestionContent.value.trim(), importance: 0.8 })
-  try {
-    await memory.writeSuggestion(conversationId.value)
-  } catch {
-    // 错误由 store 暴露在当前卡片里。
-  }
-}
-
-const previewContext = async () => {
-  previewing.value = true
-  try {
-    await memory.previewContext(conversationId.value, previewQuery.value)
-  } finally {
-    previewing.value = false
-  }
-}
+const openMemory = () => router.push('/knowledge-base')
+const openObservability = () => router.push('/observability')
 </script>
 
 <style scoped>
 .inspector-panel { display: grid; align-content: start; gap: 12px; overflow-y: auto; }
 .inspector-panel :deep(.workbench-section) { padding: 14px; box-shadow: none; }
-.inspector-panel textarea { width: 100%; margin-top: 10px; padding: 9px 10px; color: var(--color-text); background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: var(--radius-sm); resize: vertical; }
-.inspector-panel button { width: 100%; margin-top: 10px; padding: 8px 10px; color: #07111f; background: linear-gradient(135deg, var(--color-primary), var(--color-primary-strong)); border: 0; border-radius: var(--radius-sm); font-weight: 800; }
-.inspector-panel button:disabled { color: var(--color-text-subtle); background: var(--color-panel-muted); cursor: not-allowed; }
-.inspector-details { display: grid; gap: 7px; margin: 0; font-size: 0.8rem; }
-.inspector-details div { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; }
-.inspector-details dt { color: var(--color-text-subtle); }
-.inspector-details dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
-.status-error { margin: 8px 0 0; color: var(--color-danger); font-size: 0.78rem; }
-.status-success { margin: 8px 0 0; color: var(--color-success); font-size: 0.78rem; }
-.invocation-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.invocation-list li { display: grid; gap: 2px; font-size: 0.78rem; }
-.invocation-list span { color: var(--color-text-muted); overflow-wrap: anywhere; }
-
-@media (max-width: 900px) {
-  .inspector-panel { max-height: 52vh; }
-}
+.summary-line { margin: 0; color: var(--color-text); line-height: 1.55; }
+.execution-list { display: grid; gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
+.execution-list li { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: .78rem; }
+.execution-list small { color: var(--color-text-subtle); }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-primary); }
+.status-dot.error, .status-dot.failed { background: var(--color-danger); }
+.status-dot.incomplete { background: #e5a44f; }
+.outline-button { width: 100%; margin-top: 10px; padding: 8px 10px; color: var(--color-primary); background: transparent; border: 1px solid color-mix(in srgb, var(--color-primary) 45%, var(--color-border)); border-radius: var(--radius-sm); cursor: pointer; }
 </style>
