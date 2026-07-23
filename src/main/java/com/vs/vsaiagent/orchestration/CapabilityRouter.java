@@ -1,9 +1,12 @@
 package com.vs.vsaiagent.orchestration;
 
+import org.springframework.stereotype.Component;
+
 import java.util.List;
 import java.util.Locale;
 
 /** Deterministic first gate for the unified request entry point. */
+@Component
 public class CapabilityRouter {
 
     private static final List<String> KNOWLEDGE_HINTS = List.of(
