@@ -37,6 +37,7 @@ const router = useRouter()
 const memory = useMemoryStore()
 const workbench = useWorkbenchStore()
 const recent = computed(() => workbench.recentInvocations.slice(0, 4))
+const persistedSemanticCount = computed(() => memory.conversation?.semanticMemories?.length || 0)
 const executionText = computed(() => {
   const latest = recent.value[0]
   if (!latest) return '等待下一次请求'
@@ -44,9 +45,10 @@ const executionText = computed(() => {
   return statusLabel(latest.status)
 })
 const memoryText = computed(() => {
-  if (memory.memoryStatus === 'written') return '本轮已自动保存 1 条记忆，可在 Memory 中管理。'
+  if (memory.memoryStatus === 'written') return `当前会话已保存 ${persistedSemanticCount.value || 1} 条语义记忆，可在记忆页管理。`
   if (memory.memoryStatus === 'pending') return '本轮有 1 条候选记忆等待确认。'
   if (memory.memoryStatus === 'failed') return '记忆写入失败，不影响本轮回答。'
+  if (persistedSemanticCount.value) return `当前会话已有 ${persistedSemanticCount.value} 条语义记忆。`
   if (memory.memoryStatus === 'none') return '本轮未产生可写入的长期记忆。'
   return '等待本轮回答完成后评估。'
 })

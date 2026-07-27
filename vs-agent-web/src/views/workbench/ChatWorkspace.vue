@@ -292,6 +292,7 @@ const sendMessage = async (message) => {
       if (eventSource.value === source) eventSource.value = null
       chatStore.updateLastAssistantMessage(chatId.value, { status })
       workbench.addInvocation({ source: 'auto', name: '自动编排', status, summary: executionSummary.map((item) => item.label).join(' · ') || '直接回答' })
+      memoryStore.loadConversation(chatId.value)
       loading.value = false
       scrollToBottom()
     }

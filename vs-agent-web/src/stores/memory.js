@@ -105,6 +105,7 @@ export const useMemoryStore = defineStore('memory', {
       this.writing = true
       try {
         const result = await addSemanticMemory(conversationId, text, Math.min(1, Math.max(0, Number(importance) || 0)))
+        this.memoryStatus = 'written'
         this.error = ''
         await this.loadConversation(conversationId)
         return result
