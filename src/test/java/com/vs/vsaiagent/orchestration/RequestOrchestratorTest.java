@@ -1,13 +1,20 @@
 package com.vs.vsaiagent.orchestration;
 
 import com.vs.vsaiagent.app.AssistantApp;
+import com.vs.vsaiagent.agentplatform.model.ToolExecuteRequest;
+import com.vs.vsaiagent.agentplatform.model.ToolExecuteResult;
+import com.vs.vsaiagent.agentplatform.model.ToolMetadata;
+import com.vs.vsaiagent.agentplatform.service.ToolExecutionService;
+import com.vs.vsaiagent.skill.builtin.EnterpriseFieldResearchSkill;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -48,5 +55,29 @@ class RequestOrchestratorTest {
 
         assertEquals(List.of("request_started", "route_selected", "retrieval_started",
                 "final_delta", "final_delta", "retrieval_completed", "final_completed"), types);
+    }
+
+    @Test
+    void emitsEvidenceAndBlocksExportUntilServerConfirmation() {
+        AssistantApp assistantApp = mock(AssistantApp.class);
+        ToolExecutionService tools = new ToolExecutionService() {
+            @Override public ToolExecuteResult executeByName(ToolExecuteRequest request) {
+                return ToolExecuteResult.builder().toolName(request.getToolName()).success(true)
+                        .output(request.getToolName() + " evidence").build();
+            }
+            @Override public ToolExecuteResult executeByMetadata(String tag, ToolExecuteRequest request) { return executeByName(request); }
+            @Override public List<ToolMetadata> listTools() { return List.of(); }
+        };
+        EnterpriseFieldResearchDemoService demo = new EnterpriseFieldResearchDemoService(
+                new EnterpriseFieldResearchSkill(tools), tools, new FieldResearchConfirmationService());
+        RequestOrchestrator orchestrator = new RequestOrchestrator(assistantApp, new CapabilityRouter(), demo);
+
+        List<OrchestrationEvent> events = orchestrator.stream(new OrchestrationRequest("conversation-demo",
+                        "北京朝阳区客户外勤调研，请导出审批单", null, "request-demo", "trace-demo"))
+                .map(event -> event.data()).collectList().block();
+
+        assertTrue(events.stream().anyMatch(event -> "evidence_recorded".equals(event.type())));
+        assertTrue(events.stream().anyMatch(event -> "confirmation_required".equals(event.type())));
+        assertFalse(events.stream().anyMatch(event -> "rawToolOutput".equals(event.type())));
     }
 }

@@ -23,17 +23,25 @@ public class RequestOrchestrator {
     private final AssistantApp assistantApp;
     private final CapabilityRouter capabilityRouter;
     private final MemoryCandidatePipeline memoryCandidatePipeline;
+    private final EnterpriseFieldResearchDemoService fieldResearchDemoService;
 
     public RequestOrchestrator(AssistantApp assistantApp, CapabilityRouter capabilityRouter) {
-        this(assistantApp, capabilityRouter, null);
+        this(assistantApp, capabilityRouter, null, null);
+    }
+
+    public RequestOrchestrator(AssistantApp assistantApp, CapabilityRouter capabilityRouter,
+                               EnterpriseFieldResearchDemoService fieldResearchDemoService) {
+        this(assistantApp, capabilityRouter, null, fieldResearchDemoService);
     }
 
     @Autowired
     public RequestOrchestrator(AssistantApp assistantApp, CapabilityRouter capabilityRouter,
-                               MemoryCandidatePipeline memoryCandidatePipeline) {
+                               MemoryCandidatePipeline memoryCandidatePipeline,
+                               EnterpriseFieldResearchDemoService fieldResearchDemoService) {
         this.assistantApp = assistantApp;
         this.capabilityRouter = capabilityRouter;
         this.memoryCandidatePipeline = memoryCandidatePipeline;
+        this.fieldResearchDemoService = fieldResearchDemoService;
     }
 
     public Flux<ServerSentEvent<OrchestrationEvent>> stream(OrchestrationRequest request) {
@@ -45,6 +53,10 @@ public class RequestOrchestrator {
         if (message.isBlank()) {
             return Flux.just(event("request_failed", conversationId, requestId, traceId,
                     Map.of("message", "问题不能为空")));
+        }
+
+        if (fieldResearchDemoService != null && fieldResearchDemoService.supports(message)) {
+            return streamFieldResearch(conversationId, requestId, traceId, message, request.confirmationToken());
         }
 
         RoutePlan plan = capabilityRouter.route(message);
@@ -81,6 +93,32 @@ public class RequestOrchestrator {
                                 conversationId, requestId, traceId, message, finalAnswer.toString())))
                         .onErrorResume(error -> Flux.just(event("request_failed", conversationId, requestId, traceId,
                                 Map.of("message", safeMessage(error))))));
+    }
+
+    private Flux<ServerSentEvent<OrchestrationEvent>> streamFieldResearch(String conversationId, String requestId,
+                                                                            String traceId, String message,
+                                                                            String confirmationToken) {
+        EnterpriseFieldResearchDemoService.Result result = fieldResearchDemoService.execute(
+                message, conversationId, confirmationToken, traceId);
+        List<ServerSentEvent<OrchestrationEvent>> events = new ArrayList<>();
+        events.add(event("request_started", conversationId, requestId, traceId, Map.of("messageLength", message.length())));
+        events.add(event("route_selected", conversationId, requestId, traceId,
+                Map.of("route", "SKILL", "skill", "enterprise-field-research", "automatic", true)));
+        events.add(event("capability_started", conversationId, requestId, traceId,
+                Map.of("route", "SKILL", "capability", "enterprise-field-research")));
+        for (FieldResearchEvidence evidence : result.evidence()) {
+            events.add(event("evidence_recorded", conversationId, requestId, traceId, Map.of("evidence", evidence)));
+        }
+        if (result.confirmationToken() != null) {
+            events.add(event("confirmation_required", conversationId, requestId, traceId,
+                    Map.of("tool", "export_trip_approval", "confirmationToken", result.confirmationToken(),
+                            "reason", "不可逆导出操作需要当前会话确认")));
+        }
+        events.add(event("final_delta", conversationId, requestId, traceId, Map.of("text", result.answer())));
+        events.add(event("capability_completed", conversationId, requestId, traceId,
+                Map.of("status", result.confirmationToken() == null ? "success" : "blocked")));
+        return Flux.fromIterable(events).concatWith(Flux.defer(() -> finalization(
+                conversationId, requestId, traceId, message, result.answer())));
     }
 
     private String append(StringBuilder output, String text) {
