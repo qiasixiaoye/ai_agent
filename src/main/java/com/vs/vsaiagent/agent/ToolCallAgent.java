@@ -5,6 +5,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.vs.vsaiagent.agent.model.AgentState;
+import com.vs.vsaiagent.agent.model.ManusStreamEvent;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
@@ -18,8 +19,14 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.model.tool.ToolExecutionResult;
 import org.springframework.ai.tool.ToolCallback;
+import reactor.core.publisher.Flux;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -98,6 +105,103 @@ public class ToolCallAgent extends ReActAgent {
             return false;
         }
 
+    }
+
+    /**
+     * Streams model deltas to the caller while keeping a complete response for
+     * the existing tool execution path.
+     */
+    public boolean thinkStream(int step, ManusStreamEventEmitter emitter) throws IOException {
+        if (StrUtil.isNotBlank(getNextStepPrompt())) {
+            getMessageList().add(new UserMessage(getNextStepPrompt()));
+        }
+
+        Prompt prompt = new Prompt(getMessageList(), this.chatOptions);
+        List<ChatResponse> chunks;
+        try {
+            chunks = streamPrompt(prompt)
+                    .doOnNext(response -> emitThinkingDelta(step, emitter, response))
+                    .collectList()
+                    .block();
+        } catch (UncheckedIOException e) {
+            throw e.getCause();
+        }
+
+        if (CollUtil.isEmpty(chunks)) {
+            throw new IllegalStateException("Model stream returned no response");
+        }
+
+        ChatResponse chatResponse = assembleResponse(chunks);
+        this.toolCallChatResponse = chatResponse;
+        AssistantMessage assistantMessage = chatResponse.getResult().getOutput();
+        if (assistantMessage.getToolCalls().isEmpty()) {
+            getMessageList().add(assistantMessage);
+            return false;
+        }
+        return true;
+    }
+
+    protected Flux<ChatResponse> streamPrompt(Prompt prompt) {
+        return getChatClient().prompt(prompt)
+                .system(getSystemPrompt())
+                .tools(this.availableTools)
+                .stream()
+                .chatResponse();
+    }
+
+    private void emitThinkingDelta(int step, ManusStreamEventEmitter emitter, ChatResponse response) {
+        String text = response.getResult().getOutput().getText();
+        if (StrUtil.isBlank(text)) {
+            return;
+        }
+        try {
+            emitter.emit(ManusStreamEvent.thinking(step, text));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private ChatResponse assembleResponse(List<ChatResponse> chunks) {
+        StringBuilder text = new StringBuilder();
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        List<AssistantMessage.ToolCall> toolCalls = List.of();
+        ChatResponse last = chunks.get(chunks.size() - 1);
+
+        for (ChatResponse chunk : chunks) {
+            AssistantMessage output = chunk.getResult().getOutput();
+            if (output.getText() != null) {
+                text.append(output.getText());
+            }
+            if (output.getMetadata() != null) {
+                metadata.putAll(output.getMetadata());
+            }
+            if (!output.getToolCalls().isEmpty()) {
+                toolCalls = new ArrayList<>(output.getToolCalls());
+            }
+        }
+
+        AssistantMessage assistantMessage = new AssistantMessage(text.toString(), metadata, toolCalls);
+        return new ChatResponse(List.of(new org.springframework.ai.chat.model.Generation(assistantMessage)), last.getMetadata());
+    }
+
+    @Override
+    protected boolean streamStep(int step, ManusStreamEventEmitter emitter) throws IOException {
+        if (!thinkStream(step, emitter)) {
+            emitter.emit(ManusStreamEvent.answer(step, getToolCallChatResponse().getResult().getOutput().getText()));
+            setState(AgentState.FINISHED);
+            return true;
+        }
+
+        for (AssistantMessage.ToolCall toolCall : getToolCallChatResponse().getResult().getOutput().getToolCalls()) {
+            emitter.emit(ManusStreamEvent.toolCall(step, toolCall.name(), toolCall.arguments()));
+        }
+
+        act();
+        ToolResponseMessage toolResponseMessage = (ToolResponseMessage) CollUtil.getLast(getMessageList());
+        for (ToolResponseMessage.ToolResponse response : toolResponseMessage.getResponses()) {
+            emitter.emit(ManusStreamEvent.toolResult(step, response.name(), response.responseData()));
+        }
+        return getState() == AgentState.FINISHED;
     }
 
     @Override
