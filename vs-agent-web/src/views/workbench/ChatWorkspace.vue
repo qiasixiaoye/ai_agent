@@ -78,7 +78,15 @@
           <LoadingIndicator v-if="loading" />
         </div>
 
-        <ChatInput :loading="loading" @send="sendMessage" />
+        <div class="demo-bar">
+          <span>企业级演示：自动 Skill、工具引用、记忆与确认门禁。</span>
+          <button type="button" class="text-button" :disabled="loading" @click="fillEnterpriseDemo">填入外勤调研示例</button>
+        </div>
+        <div v-if="pendingConfirmation" class="confirmation-bar">
+          <span>审批单导出需要确认；未确认不会执行。</span>
+          <button type="button" class="text-button" @click="confirmExport">确认并导出</button>
+        </div>
+        <ChatInput ref="chatInput" :loading="loading" @send="sendMessage" />
       </div>
     </div>
   </section>
@@ -117,6 +125,10 @@ const messagesContainer = ref(null)
 const lastUserMessage = ref('')
 const MEMORY_EXAMPLE_MESSAGE = '请记住：我偏好中文回答，先给结论，再给步骤。'
 const selectedSkill = ref('')
+const pendingConfirmation = ref(null)
+const chatInput = ref(null)
+const ENTERPRISE_FIELD_RESEARCH_SAMPLE = '我下周要去北京朝阳区做客户外勤调研。请结合天气和公共出行风险，给出上午/下午建议；我偏好中文回答、先给结论再给步骤。若需要导出含联系方式的行程审批单，请先向我确认。'
+const fillEnterpriseDemo = () => chatInput.value?.setMessage(ENTERPRISE_FIELD_RESEARCH_SAMPLE)
 const messages = computed(() => chatStore.assistantAppChats[chatId.value]?.messages || [])
 const conversations = computed(() => Object.values(chatStore.assistantAppChats)
   .sort((left, right) => Number(Boolean(right.pinned)) - Number(Boolean(left.pinned))
@@ -244,7 +256,13 @@ const executeTriggeredSkill = async (message, manualSkill) => {
   return true
 }
 
-const sendMessage = async (message) => {
+const confirmExport = () => {
+  const token = pendingConfirmation.value?.token
+  pendingConfirmation.value = null
+  if (token && lastUserMessage.value) sendMessage(lastUserMessage.value, token)
+}
+
+const sendMessage = async (message, confirmationToken = '') => {
   if (loading.value) return
   const requestMode = mode.value
   lastUserMessage.value = message
@@ -254,7 +272,7 @@ const sendMessage = async (message) => {
   try {
     if (await executeTriggeredSkill(message, selectedSkill.value)) return
     eventSource.value?.close()
-    const source = connectToOrchestrator(message, chatId.value)
+    const source = connectToOrchestrator(message, chatId.value, '', '', confirmationToken)
     eventSource.value = source
     let aiResponse = ''
     let assistantMessageAdded = false
@@ -308,6 +326,19 @@ const sendMessage = async (message) => {
         executionSummary.push({ type: eventName, label: labels[eventName] })
         updateDetails()
       })
+    })
+    source.addEventListener('evidence_recorded', (event) => {
+      const { payload } = parseEvent(event)
+      const evidence = payload.evidence || {}
+      workbench.addEvidence(evidence)
+      executionSummary.push({ type: 'evidence', label: `引用：${evidence.capability || '能力'} · ${evidence.status || 'unknown'}` })
+      updateDetails()
+    })
+    source.addEventListener('confirmation_required', (event) => {
+      const { payload } = parseEvent(event)
+      pendingConfirmation.value = { token: payload.confirmationToken, tool: payload.tool, reason: payload.reason }
+      executionSummary.push({ type: 'confirmation', label: `待确认：${payload.tool || '不可逆操作'}` })
+      updateDetails()
     })
     source.addEventListener('final_delta', (event) => appendDelta(parseEvent(event).payload.text))
     source.addEventListener('final_completed', (event) => {
@@ -387,6 +418,10 @@ const sendMessage = async (message) => {
 .chat-transcript { min-height: 0; overflow-y: auto; padding: 22px; }
 .empty-transcript { display: grid; gap: 6px; max-width: 520px; margin: 28px auto; padding: 20px; border: 1px dashed var(--color-border); border-radius: 12px; color: var(--color-text-muted); text-align: center; }
 .empty-transcript strong { color: var(--color-text); }
+
+.confirmation-bar, .demo-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 16px; font-size: .8rem; }
+.confirmation-bar { color: #f0c26a; background: rgba(240, 194, 106, .08); border-top: 1px solid rgba(240, 194, 106, .28); }
+.demo-bar { color: var(--color-text-muted); background: rgba(79, 155, 255, .06); border-top: 1px solid var(--color-border); }
 
 @media (max-width: 900px) {
   .chat-workspace { min-height: calc(100vh - 150px); border-radius: var(--radius-md); }

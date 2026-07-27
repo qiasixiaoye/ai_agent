@@ -59,9 +59,9 @@ public class AiController {
 
     @GetMapping(value = "/orchestrate/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<com.vs.vsaiagent.orchestration.OrchestrationEvent>> orchestrateGet(
-            String message, String conversationId, String requestId, String traceId) {
+            String message, String conversationId, String requestId, String traceId, String confirmationToken) {
         return requestOrchestrator.stream(new OrchestrationRequest(
-                conversationId, message, null, requestId, traceId));
+                conversationId, message, confirmationToken, requestId, traceId));
     }
 
     @GetMapping("/assistant_app/chat/sync")

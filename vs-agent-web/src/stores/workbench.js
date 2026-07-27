@@ -16,6 +16,7 @@ export const useWorkbenchStore = defineStore('workbench', {
     activeArea: 'chat',
     inspectorOpen: true,
     recentInvocations: [],
+    recentEvidence: [],
     permissionDetailOpen: true
   }),
   actions: {
@@ -46,6 +47,10 @@ export const useWorkbenchStore = defineStore('workbench', {
         ...invocation
       })
       this.recentInvocations = this.recentInvocations.slice(0, 12)
+    },
+    addEvidence(evidence) {
+      this.recentEvidence.unshift({ id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, ...evidence })
+      this.recentEvidence = this.recentEvidence.slice(0, 12)
     }
   }
 })

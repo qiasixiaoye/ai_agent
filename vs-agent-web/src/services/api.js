@@ -23,13 +23,14 @@ export const connectToAssistantAppRagChat = (message, chatId) =>
 export const connectToManusChat = (message, sessionId) =>
   new EventSource(`${baseURL}/ai/manus/chat?message=${encodeURIComponent(message)}&sessionId=${encodeURIComponent(sessionId)}`)
 
-export const connectToOrchestrator = (message, conversationId, requestId = '', traceId = '') => {
+export const connectToOrchestrator = (message, conversationId, requestId = '', traceId = '', confirmationToken = '') => {
   const params = new URLSearchParams({
     message: String(message || ''),
     conversationId: String(conversationId || '')
   })
   if (requestId) params.set('requestId', requestId)
   if (traceId) params.set('traceId', traceId)
+  if (confirmationToken) params.set('confirmationToken', confirmationToken)
   return new EventSource(`${baseURL}/ai/orchestrate/stream?${params.toString()}`)
 }
 

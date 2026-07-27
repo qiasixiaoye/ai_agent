@@ -33,6 +33,13 @@ const onSubmit = () => {
   message.value = ''
   setTimeout(() => inputRef.value?.focus(), 0)
 }
+
+defineExpose({
+  setMessage(value) {
+    message.value = String(value || '')
+    setTimeout(() => inputRef.value?.focus(), 0)
+  }
+})
 </script>
 
 <style scoped>
