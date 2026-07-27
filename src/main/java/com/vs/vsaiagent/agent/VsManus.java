@@ -5,6 +5,7 @@ import com.vs.vsaiagent.advisor.MyLoggerAdvisor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.ToolCallback;
+import java.util.concurrent.Executor;
 
 /**
  * 实现 领域智能体
@@ -34,5 +35,10 @@ public class VsManus extends ToolCallAgent{
                 .build();
         this.setChatClient(chatClient);
 
+    }
+
+    public VsManus(ToolCallback[] allTools, ChatModel dashscopeChatClient, Executor executionExecutor) {
+        this(allTools, dashscopeChatClient);
+        this.setExecutionExecutor(executionExecutor);
     }
 }

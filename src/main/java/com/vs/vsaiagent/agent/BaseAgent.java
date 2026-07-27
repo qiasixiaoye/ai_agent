@@ -14,6 +14,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -31,6 +33,7 @@ public abstract class BaseAgent {
     private int maxSteps = 10;
     private ChatClient chatClient;
     private List<Message> messageList = new ArrayList<>();
+    private Executor executionExecutor = ForkJoinPool.commonPool();
     private final AtomicBoolean cleanedUp = new AtomicBoolean(false);
 
     public String run(String userPrompt) {
@@ -103,7 +106,7 @@ public abstract class BaseAgent {
             } finally {
                 cleanupOnce();
             }
-        }));
+        }), executionExecutor);
 
         sseEmitter.onTimeout(() -> {
             this.state = AgentState.ERROR;

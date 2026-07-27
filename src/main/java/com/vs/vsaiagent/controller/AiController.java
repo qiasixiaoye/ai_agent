@@ -9,6 +9,7 @@ import com.vs.vsaiagent.orchestration.RequestOrchestrator;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.http.MediaType;
@@ -23,6 +24,7 @@ import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.Executor;
 
 @Slf4j
 @RestController
@@ -43,6 +45,10 @@ public class AiController {
 
     @Resource
     private ManusConversationMemory manusConversationMemory;
+
+    @Autowired
+    @Qualifier("manusAgentExecutor")
+    private Executor manusAgentExecutor;
 
     @PostMapping(value = "/orchestrate/stream", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -106,7 +112,7 @@ public class AiController {
 
     @GetMapping(value = "/manus/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter doChatWithManus(String message, String sessionId) {
-        VsManus vsManus = new VsManus(allTools, chatModel);
+        VsManus vsManus = new VsManus(allTools, chatModel, manusAgentExecutor);
         List<org.springframework.ai.chat.messages.Message> history = manusConversationMemory.restore(sessionId);
         vsManus.setMessageList(history);
         SseEmitter emitter = vsManus.runStream(message);
