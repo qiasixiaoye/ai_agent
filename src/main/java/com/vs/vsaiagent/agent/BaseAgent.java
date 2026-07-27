@@ -67,11 +67,7 @@ public abstract class BaseAgent {
     /**
      * Runs the agent on a background thread and writes named typed SSE events.
      */
-    public SseEmitter runStream(String userPrompt, String contentText) {
-        if (StrUtil.isNotBlank(contentText)) {
-            messageList.add(new UserMessage("Previous conversation history:\n" + contentText));
-        }
-
+    public SseEmitter runStream(String userPrompt) {
         SseEmitter sseEmitter = new SseEmitter(300000L);
         ManusStreamEventEmitter eventEmitter = new ManusStreamEventEmitter(event ->
                 sseEmitter.send(SseEmitter.event().name(event.type()).data(event)));

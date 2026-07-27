@@ -91,13 +91,13 @@ const eventSource = ref(null)
 const mode = ref('normal')
 const messages = ref([])
 
-// Manus 模式自带的多轮历史（随对话累积，作为 contentText 回传）
-let agentHistory = []
+let agentSessionId = ''
 
 const currentMode = computed(() => modes.find((m) => m.key === mode.value))
 
 onMounted(() => {
   chatId.value = chatStore.createAssistantAppChat()
+  agentSessionId = crypto.randomUUID()
   chatStore.addAssistantAppMessage(
     chatId.value,
     '您好，我是 AI 助手。上方可切换「普通 / RAG / 智能体」三种模式，请发送消息开始。',
@@ -138,8 +138,7 @@ const scrollToBottom = () => {
 
 const openConnection = (message) => {
   if (mode.value === 'agent') {
-    agentHistory.push({ user: message })
-    return connectToManusChat(message, JSON.stringify(agentHistory))
+    return connectToManusChat(message, agentSessionId)
   }
   if (mode.value === 'rag') {
     return connectToAssistantAppRagChat(message, chatId.value)
@@ -189,7 +188,6 @@ const sendMessage = async (message) => {
         }
         updateManusMessage()
         source.close()
-        if (event.type === 'complete') agentHistory.push({ assistant: streamState.answerText })
         loading.value = false
       }
 

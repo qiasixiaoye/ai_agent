@@ -20,8 +20,8 @@ export const connectToAssistantAppChat = (message, chatId) =>
 export const connectToAssistantAppRagChat = (message, chatId) =>
   new EventSource(`${baseURL}/ai/assistant_app/chat_rag/sse?message=${encodeURIComponent(message)}&chatId=${encodeURIComponent(chatId)}`)
 
-export const connectToManusChat = (message, contentText) =>
-  new EventSource(`${baseURL}/ai/manus/chat?message=${encodeURIComponent(message)}&contentText=${encodeURIComponent(contentText)}`)
+export const connectToManusChat = (message, sessionId) =>
+  new EventSource(`${baseURL}/ai/manus/chat?message=${encodeURIComponent(message)}&sessionId=${encodeURIComponent(sessionId)}`)
 
 export const connectToOrchestrator = (message, conversationId, requestId = '', traceId = '') => {
   const params = new URLSearchParams({

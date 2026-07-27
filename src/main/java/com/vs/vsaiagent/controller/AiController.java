@@ -1,6 +1,8 @@
 package com.vs.vsaiagent.controller;
 
 import com.vs.vsaiagent.agent.VsManus;
+import com.vs.vsaiagent.agent.ManusConversationMemory;
+import com.vs.vsaiagent.agent.model.AgentState;
 import com.vs.vsaiagent.app.AssistantApp;
 import com.vs.vsaiagent.orchestration.OrchestrationRequest;
 import com.vs.vsaiagent.orchestration.RequestOrchestrator;
@@ -20,6 +22,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
 
 import java.io.IOException;
+import java.util.List;
 
 @Slf4j
 @RestController
@@ -37,6 +40,9 @@ public class AiController {
 
     @Resource
     private RequestOrchestrator requestOrchestrator;
+
+    @Resource
+    private ManusConversationMemory manusConversationMemory;
 
     @PostMapping(value = "/orchestrate/stream", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -99,9 +105,16 @@ public class AiController {
     }
 
     @GetMapping(value = "/manus/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter doChatWithManus(String message, String contentText) {
+    public SseEmitter doChatWithManus(String message, String sessionId) {
         VsManus vsManus = new VsManus(allTools, chatModel);
-        log.info("[manus] contentText={}", contentText);
-        return vsManus.runStream(message, contentText);
+        List<org.springframework.ai.chat.messages.Message> history = manusConversationMemory.restore(sessionId);
+        vsManus.setMessageList(history);
+        SseEmitter emitter = vsManus.runStream(message);
+        emitter.onCompletion(() -> {
+            if (vsManus.getState() == AgentState.FINISHED) {
+                manusConversationMemory.persistNewMessages(sessionId, vsManus.getMessageList(), history.size());
+            }
+        });
+        return emitter;
     }
 }
