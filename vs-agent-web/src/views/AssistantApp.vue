@@ -19,6 +19,15 @@
       </button>
     </div>
 
+    <div class="skill-bar">
+      <select v-model="selectedSkill" :disabled="loading">
+        <option value="">自动选择（仅在参数完整时触发）</option>
+        <option value="astro-shoot-plan">Skill：银河拍摄计划</option>
+      </select>
+      <button type="button" :disabled="loading" @click="sendAstroSample">运行真实 Skill 样例</button>
+      <span>样例会编排银河升起、光污染和云量工具</span>
+    </div>
+
     <div class="chat-messages" ref="messagesContainer">
       <div v-if="messages.length === 0" class="empty-state">
         <div class="empty-icon">🤖</div>
@@ -62,13 +71,16 @@ import { useChatStore } from '../stores/chat'
 import {
   connectToAssistantAppChat,
   connectToAssistantAppRagChat,
-  connectToManusChat
+  connectToManusChat,
+  executeSkill,
+  previewSkillRoute
 } from '../services/api'
 import ChatMessage from '../components/ChatMessage.vue'
 import ChatInput from '../components/ChatInput.vue'
 import LoadingIndicator from '../components/LoadingIndicator.vue'
 import { useHead } from '@vueuse/head'
 import { applyManusStreamEvent, createManusStreamState } from '../utils/manusStream'
+import { astroShootPlanSample, resolveAutoSkill } from '../utils/conversationalSkill'
 
 useHead({
   title: 'AI 对话 - 普通 / RAG 知识问答 / 智能体 | AI Agent Platform',
@@ -90,6 +102,7 @@ const chatId = ref('')
 const eventSource = ref(null)
 const mode = ref('normal')
 const messages = ref([])
+const selectedSkill = ref('')
 
 let agentSessionId = ''
 
@@ -146,6 +159,17 @@ const openConnection = (message) => {
   return connectToAssistantAppChat(message, chatId.value)
 }
 
+const appendSkillResult = (skill, result, mode) => {
+  const output = typeof result?.data === 'string' ? result.data : JSON.stringify(result?.data ?? result)
+  chatStore.addAssistantAppMessage(chatId.value, `[${mode === 'manual' ? '手动选择' : '自动路由'} Skill: ${skill}]\n${output}`, false)
+  syncMessagesFromStore()
+}
+
+const sendAstroSample = () => {
+  selectedSkill.value = astroShootPlanSample().name
+  sendMessage('运行银河拍摄计划 Skill 样例：纬度39.9042 经度116.4074 2026-08-15')
+}
+
 const sendMessage = async (message) => {
   if (loading.value) return
 
@@ -154,6 +178,17 @@ const sendMessage = async (message) => {
   loading.value = true
 
   try {
+    const manual = selectedSkill.value
+    const manualPayload = manual === 'astro-shoot-plan' ? astroShootPlanSample() : null
+    const route = !manual && mode.value === 'normal' ? await previewSkillRoute(message) : null
+    const automaticPayload = !manual ? resolveAutoSkill(route, message) : null
+    const skillPayload = manualPayload || automaticPayload
+    if (skillPayload) {
+      const result = await executeSkill(skillPayload.name, skillPayload.arguments)
+      appendSkillResult(skillPayload.name, result, manualPayload ? 'manual' : 'auto')
+      loading.value = false
+      return
+    }
     if (eventSource.value) {
       eventSource.value.close()
     }
