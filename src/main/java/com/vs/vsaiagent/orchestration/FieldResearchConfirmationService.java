@@ -6,6 +6,7 @@ import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Server-side, single-use confirmation gate for the demonstration export action. */
 @Component
@@ -25,9 +26,16 @@ public class FieldResearchConfirmationService {
 
     public boolean consume(String conversationId, String token) {
         if (conversationId == null || conversationId.isBlank() || token == null || token.isBlank()) return false;
-        PendingConfirmation confirmation = pending.remove(token);
-        return confirmation != null && confirmation.expiresAt() >= System.currentTimeMillis()
-                && conversationId.equals(confirmation.conversationId());
+        AtomicBoolean accepted = new AtomicBoolean(false);
+        pending.compute(token, (ignored, confirmation) -> {
+            if (confirmation != null && confirmation.expiresAt() >= System.currentTimeMillis()
+                    && conversationId.equals(confirmation.conversationId())) {
+                accepted.set(true);
+                return null;
+            }
+            return confirmation;
+        });
+        return accepted.get();
     }
 
     private record PendingConfirmation(String conversationId, long expiresAt) { }
