@@ -2,6 +2,7 @@ package com.vs.vsaiagent.agent;
 
 import cn.hutool.core.util.StrUtil;
 import com.vs.vsaiagent.agent.model.AgentState;
+import com.vs.vsaiagent.observability.context.TraceContext;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -75,7 +76,7 @@ public abstract class BaseAgent {
         ManusStreamEventEmitter eventEmitter = new ManusStreamEventEmitter(event ->
                 sseEmitter.send(SseEmitter.event().name(event.type()).data(event)));
 
-        CompletableFuture.runAsync(() -> {
+        CompletableFuture.runAsync(TraceContext.wrap(() -> {
             try {
                 validateRunRequest(userPrompt);
                 this.state = AgentState.RUNNING;
@@ -106,7 +107,7 @@ public abstract class BaseAgent {
             } finally {
                 cleanupOnce();
             }
-        });
+        }));
 
         sseEmitter.onTimeout(() -> {
             this.state = AgentState.ERROR;

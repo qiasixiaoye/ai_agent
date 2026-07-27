@@ -19,6 +19,27 @@ public final class TraceContext {
         HOLDER.remove();
     }
 
+    public static Runnable wrap(Runnable task) {
+        TraceInfo captured = HOLDER.get();
+        return () -> {
+            TraceInfo previous = HOLDER.get();
+            try {
+                if (captured == null) {
+                    HOLDER.remove();
+                } else {
+                    HOLDER.set(captured);
+                }
+                task.run();
+            } finally {
+                if (previous == null) {
+                    HOLDER.remove();
+                } else {
+                    HOLDER.set(previous);
+                }
+            }
+        };
+    }
+
     public static void setSessionId(String sessionId) {
         TraceInfo old = HOLDER.get();
         if (old == null) {
