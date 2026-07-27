@@ -6,6 +6,7 @@ mcp-servers.json
 .env
 tmp
 runtime/
+/.worktrees/
 
 HELP.md
 target/
