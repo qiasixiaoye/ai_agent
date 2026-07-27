@@ -10,6 +10,7 @@ import com.vs.vsaiagent.observability.enums.ExecutionStatus;
 import com.vs.vsaiagent.observability.repository.AgentRequestLogRepository;
 import com.vs.vsaiagent.observability.repository.AgentStageLogRepository;
 import com.vs.vsaiagent.observability.service.ExecutionLogService;
+import com.vs.vsaiagent.observability.service.StageLogBuffer;
 import com.vs.vsaiagent.observability.vo.RequestTraceVO;
 import org.springframework.stereotype.Service;
 
@@ -22,11 +23,14 @@ public class ExecutionLogServiceImpl implements ExecutionLogService {
 
     private final AgentRequestLogRepository requestLogRepository;
     private final AgentStageLogRepository stageLogRepository;
+    private final StageLogBuffer stageLogBuffer;
 
     public ExecutionLogServiceImpl(AgentRequestLogRepository requestLogRepository,
-                                   AgentStageLogRepository stageLogRepository) {
+                                   AgentStageLogRepository stageLogRepository,
+                                   StageLogBuffer stageLogBuffer) {
         this.requestLogRepository = requestLogRepository;
         this.stageLogRepository = stageLogRepository;
+        this.stageLogBuffer = stageLogBuffer;
     }
 
     @Override
@@ -55,7 +59,7 @@ public class ExecutionLogServiceImpl implements ExecutionLogService {
     public void logStage(String requestId, ExecutionStageType stageType, String stageName, String toolName,
                          String inputPayload, String outputPayload, Long costMs, boolean success, String errorMessage) {
         TraceInfo traceInfo = TraceContext.get();
-        stageLogRepository.insert(AgentStageLogEntity.builder()
+        stageLogBuffer.offer(AgentStageLogEntity.builder()
                 .requestId(requestId)
                 .traceId(traceInfo == null ? null : traceInfo.traceId())
                 .sessionId(traceInfo == null ? null : traceInfo.sessionId())

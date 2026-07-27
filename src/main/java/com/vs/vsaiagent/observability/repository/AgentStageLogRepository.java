@@ -2,6 +2,7 @@ package com.vs.vsaiagent.observability.repository;
 
 import com.vs.vsaiagent.observability.entity.AgentStageLogEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
@@ -53,6 +54,40 @@ public class AgentStageLogRepository {
                 entity.getSuccess(),
                 entity.getErrorMessage(),
                 Timestamp.valueOf(entity.getEventTime()));
+    }
+
+    public void batchInsert(List<AgentStageLogEntity> entities) {
+        if (entities.isEmpty()) {
+            return;
+        }
+        String sql = """
+                INSERT INTO agent_stage_log
+                (request_id, trace_id, session_id, stage_type, stage_name, tool_name, input_payload, output_payload, cost_ms, success, error_message, event_time)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """;
+        jdbcTemplate.batchUpdate(sql, new BatchPreparedStatementSetter() {
+            @Override
+            public void setValues(java.sql.PreparedStatement statement, int index) throws java.sql.SQLException {
+                AgentStageLogEntity entity = entities.get(index);
+                statement.setString(1, entity.getRequestId());
+                statement.setString(2, entity.getTraceId());
+                statement.setString(3, entity.getSessionId());
+                statement.setString(4, entity.getStageType());
+                statement.setString(5, entity.getStageName());
+                statement.setString(6, entity.getToolName());
+                statement.setString(7, entity.getInputPayload());
+                statement.setString(8, entity.getOutputPayload());
+                statement.setObject(9, entity.getCostMs());
+                statement.setObject(10, entity.getSuccess());
+                statement.setString(11, entity.getErrorMessage());
+                statement.setTimestamp(12, Timestamp.valueOf(entity.getEventTime()));
+            }
+
+            @Override
+            public int getBatchSize() {
+                return entities.size();
+            }
+        });
     }
 
     public List<AgentStageLogEntity> listByRequestId(String requestId) {
