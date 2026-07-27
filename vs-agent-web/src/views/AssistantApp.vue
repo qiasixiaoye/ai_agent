@@ -33,6 +33,17 @@
           :isUser="message.isUser"
           :timestamp="message.timestamp"
         />
+        <details
+          v-for="message in messages.filter(item => !item.isUser && item.manusTrace?.length)"
+          :key="`${message.id}-manus-trace`"
+          class="manus-trace"
+        >
+          <summary>Agent execution trace</summary>
+          <div v-for="(event, index) in message.manusTrace" :key="`${event.type}-${index}`" class="manus-trace-item">
+            <strong>{{ event.type }}</strong>
+            <span>{{ event.text || event.toolName || event.toolResult }}</span>
+          </div>
+        </details>
         <LoadingIndicator v-if="loading" />
       </template>
     </div>
@@ -57,6 +68,7 @@ import ChatMessage from '../components/ChatMessage.vue'
 import ChatInput from '../components/ChatInput.vue'
 import LoadingIndicator from '../components/LoadingIndicator.vue'
 import { useHead } from '@vueuse/head'
+import { applyManusStreamEvent, createManusStreamState } from '../utils/manusStream'
 
 useHead({
   title: 'AI 对话 - 普通 / RAG 知识问答 / 智能体 | AI Agent Platform',
@@ -147,12 +159,67 @@ const sendMessage = async (message) => {
       eventSource.value.close()
     }
 
-    eventSource.value = openConnection(message)
+    const source = openConnection(message)
+    eventSource.value = source
+    const isManus = mode.value === 'agent'
+
+    if (isManus) {
+      let streamState = createManusStreamState()
+      let messageAdded = false
+
+      const updateManusMessage = () => {
+        if (!messageAdded) {
+          loading.value = false
+          chatStore.addAssistantAppMessage(chatId.value, streamState.answerText, false)
+          messageAdded = true
+        }
+        const lastMessage = chatStore.assistantAppChats[chatId.value].messages.slice(-1)[0]
+        if (lastMessage && !lastMessage.isUser) {
+          lastMessage.content = streamState.answerText
+          lastMessage.manusTrace = streamState.trace
+        }
+        syncMessagesFromStore()
+        scrollToBottom()
+      }
+
+      const finishManus = (event) => {
+        if (!streamState.terminal) return
+        if (event.type === 'error' && !streamState.answerText) {
+          streamState = { ...streamState, answerText: streamState.errorMessage }
+        }
+        updateManusMessage()
+        source.close()
+        if (event.type === 'complete') agentHistory.push({ assistant: streamState.answerText })
+        loading.value = false
+      }
+
+      const consumeManusEvent = (event) => {
+        try {
+          const payload = JSON.parse(event.data)
+          streamState = applyManusStreamEvent(streamState, payload)
+          updateManusMessage()
+          finishManus(payload)
+        } catch (error) {
+          console.error('Unable to parse Manus stream event:', error)
+        }
+      }
+
+      for (const eventName of ['thinking', 'tool_call', 'tool_result', 'answer', 'complete', 'error']) {
+        source.addEventListener(eventName, consumeManusEvent)
+      }
+      source.onerror = () => {
+        if (!streamState.terminal) {
+          streamState = applyManusStreamEvent(streamState, { type: 'error', message: 'Manus stream connection failed' })
+          finishManus({ type: 'error' })
+        }
+      }
+      return
+    }
 
     let aiResponse = ''
     let messageAdded = false
 
-    eventSource.value.onmessage = (event) => {
+    source.onmessage = (event) => {
       if (event.data) {
         aiResponse += event.data
         if (!messageAdded) {
@@ -171,15 +238,12 @@ const sendMessage = async (message) => {
     }
 
     const finalize = () => {
-      eventSource.value.close()
-      if (mode.value === 'agent') {
-        agentHistory.push({ assistant: aiResponse })
-      }
+      source.close()
       loading.value = false
     }
 
-    eventSource.value.onerror = finalize
-    eventSource.value.addEventListener('complete', finalize)
+    source.onerror = finalize
+    source.addEventListener('complete', finalize)
   } catch (error) {
     console.error('连接聊天服务失败:', error)
     loading.value = false
