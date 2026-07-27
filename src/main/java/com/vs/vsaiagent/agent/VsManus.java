@@ -3,15 +3,12 @@ package com.vs.vsaiagent.agent;
 
 import com.vs.vsaiagent.advisor.MyLoggerAdvisor;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.ToolCallback;
-import org.springframework.stereotype.Component;
 
 /**
  * 实现 领域智能体
  */
-@Component
 public class VsManus extends ToolCallAgent{
 
 

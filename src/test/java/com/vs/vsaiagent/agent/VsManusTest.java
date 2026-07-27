@@ -1,26 +1,21 @@
 package com.vs.vsaiagent.agent;
 
-import jakarta.annotation.Resource;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
-
-@SpringBootTest
 class VsManusTest {
 
-    @Resource
-    private VsManus vsManus;
-
     @Test
-    public void run() {
-        String userPrompt = """
-                我的另一半居住在上海静安区，请帮我找到 5 公里内合适的约会地点，
-                并以 PDF 格式输出""";
-        String answer = vsManus.run(userPrompt);
-        Assertions.assertNotNull(answer);
-    }
+    void isNotDiscoveredAsASpringSingletonCandidate() {
+        ClassPathScanningCandidateComponentProvider scanner =
+                new ClassPathScanningCandidateComponentProvider(true);
 
+        boolean discovered = scanner.findCandidateComponents("com.vs.vsaiagent.agent").stream()
+                .anyMatch(candidate -> VsManus.class.getName().equals(candidate.getBeanClassName()));
+
+        assertFalse(discovered,
+                "VsManus owns mutable execution state and must only be constructed per request");
+    }
 }
