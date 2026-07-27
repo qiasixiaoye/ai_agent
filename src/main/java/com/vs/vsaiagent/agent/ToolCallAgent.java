@@ -23,9 +23,11 @@ import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -37,6 +39,9 @@ import java.util.stream.Collectors;
 @Data
 @Slf4j
 public class ToolCallAgent extends ReActAgent {
+
+    private static final int MAX_MODEL_ATTEMPTS = 3;
+    private static final Duration INITIAL_RETRY_BACKOFF = Duration.ofMillis(200);
 
     // 可用工具
     private final ToolCallback[] availableTools;
@@ -75,12 +80,7 @@ public class ToolCallAgent extends ReActAgent {
         //调用llm，得到工具调用的结果
         List<Message> messageList = getMessageList();
         Prompt prompt = new Prompt(messageList,this.chatOptions);
-        try {
-            ChatResponse chatResponse = getChatClient().prompt(prompt)
-                    .system(getSystemPrompt())
-                    .tools(this.availableTools)
-                    .call()
-                    .chatResponse();
+        ChatResponse chatResponse = callWithRetry(prompt);
             // 解析工具调用结果，获取要调用的工具
             this.toolCallChatResponse = chatResponse;
             // 得到llm 的回答
@@ -98,13 +98,61 @@ public class ToolCallAgent extends ReActAgent {
                 getMessageList().add(assistantMessage);
                 return false;
             }
-            return true;
-        } catch (Exception e) {
-            log.error(getName() + "思考过程遇到问题" + e.getMessage());
-            getMessageList().add(new AssistantMessage("思考过程遇到问题" + e.getMessage()));
-            return false;
-        }
+        return true;
 
+    }
+
+    protected ChatResponse callPrompt(Prompt prompt) {
+        return getChatClient().prompt(prompt)
+                .system(getSystemPrompt())
+                .tools(this.availableTools)
+                .call()
+                .chatResponse();
+    }
+
+    private ChatResponse callWithRetry(Prompt prompt) {
+        RuntimeException lastFailure = null;
+        for (int attempt = 1; attempt <= MAX_MODEL_ATTEMPTS; attempt++) {
+            try {
+                return callPrompt(prompt);
+            } catch (RuntimeException e) {
+                lastFailure = e;
+                if (!isRetryable(e) || attempt == MAX_MODEL_ATTEMPTS) {
+                    throw e;
+                }
+                log.warn("{} model call failed transiently; retrying attempt {}/{}", getName(),
+                        attempt + 1, MAX_MODEL_ATTEMPTS, e);
+                sleepBeforeRetry(attempt);
+            }
+        }
+        throw lastFailure;
+    }
+
+    protected void sleepBeforeRetry(int retryAttempt) {
+        long delayMillis = INITIAL_RETRY_BACKOFF.toMillis() * (1L << (retryAttempt - 1));
+        try {
+            Thread.sleep(delayMillis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Model retry interrupted", e);
+        }
+    }
+
+    private boolean isRetryable(Throwable failure) {
+        Throwable current = failure;
+        for (int depth = 0; current != null && depth < 8; depth++, current = current.getCause()) {
+            if (current instanceof IOException || current instanceof java.util.concurrent.TimeoutException) {
+                return true;
+            }
+            String signal = (current.getClass().getSimpleName() + " " + current.getMessage())
+                    .toLowerCase(Locale.ROOT);
+            if (signal.contains("429") || signal.contains("rate limit") || signal.contains("timeout")
+                    || signal.contains("temporar") || signal.contains("503")
+                    || signal.contains("service unavailable") || signal.contains("connection reset")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
