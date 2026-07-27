@@ -95,6 +95,7 @@ import { useWorkbenchStore } from '../../stores/workbench'
 import { resolveChatSession } from '../../utils/chatSession'
 import { connectToOrchestrator, executeSkill, previewSkillRoute } from '../../services/api'
 import { astroShootPlanSample, resolveAutoSkill } from '../../utils/conversationalSkill'
+import { useRoute, useRouter } from 'vue-router'
 
 const modeOptions = [
   { value: 'normal', label: '普通对话' },
@@ -106,12 +107,15 @@ const WELCOME_MESSAGE = '你好，我会根据你的问题自动选择直接回�
 const chatStore = useChatStore()
 const memoryStore = useMemoryStore()
 const workbench = useWorkbenchStore()
+const router = useRouter()
+const route = useRoute()
 const mode = ref(workbench.currentMode || 'normal')
 const chatId = ref('')
 const loading = ref(false)
 const eventSource = ref(null)
 const messagesContainer = ref(null)
 const lastUserMessage = ref('')
+const MEMORY_EXAMPLE_MESSAGE = '请记住：我偏好中文回答，先给结论，再给步骤。'
 const selectedSkill = ref('')
 const messages = computed(() => chatStore.assistantAppChats[chatId.value]?.messages || [])
 const conversations = computed(() => Object.values(chatStore.assistantAppChats)
@@ -132,8 +136,13 @@ const conversationGroups = computed(() => {
 })
 
 watch(mode, (value) => workbench.setMode(value), { immediate: true })
-onMounted(() => {
+onMounted(async () => {
   chatId.value = resolveChatSession({ chatStore, workbench, welcomeMessage: WELCOME_MESSAGE }).chatId
+  if (route.query.example === 'memory') {
+    await router.replace({ query: { ...route.query, example: undefined } })
+    await nextTick()
+    sendMessage(MEMORY_EXAMPLE_MESSAGE)
+  }
 })
 const categoryLabel = (category) => categoryOptions.find((option) => option.value === category)?.label || '普通对话'
 const formatUpdatedAt = (value) => {

@@ -2,10 +2,10 @@
   <section class="workspace">
     <header class="workspace-header">
       <div>
-        <h1>任务执行</h1>
-        <p class="muted">面向 Agent 产品的任务运行台：选择能力、提交任务、查看结果。</p>
+        <h1>开发调试</h1>
+        <p class="muted">用于验证底层 Tool、JSON 任务与多步骤编排。普通提问、Skill 和记忆请从对话入口开始。</p>
       </div>
-      <button type="button" :disabled="catalogLoading" @click="refreshTools">{{ catalogLoading ? '刷新中…' : '刷新能力' }}</button>
+      <div class="header-actions"><button type="button" @click="router.push('/')">从对话入口开始</button><button type="button" :disabled="catalogLoading" @click="refreshTools">{{ catalogLoading ? '刷新中…' : '刷新能力' }}</button></div>
     </header>
 
     <p v-if="localError" class="status-error">{{ localError }}</p>
@@ -70,8 +70,10 @@ import {
 import { useWorkbenchStore } from '../../stores/workbench'
 import { parseJsonObject } from '../../utils/streamLifecycle'
 import { localizedDescription } from '../../utils/productText'
+import { useRouter } from 'vue-router'
 
 const workbench = useWorkbenchStore()
+const router = useRouter()
 const tools = ref([])
 const catalogLoading = ref(false)
 const selectedToolName = ref('')
@@ -175,5 +177,5 @@ onMounted(refreshTools)
 </script>
 
 <style scoped>
-.workspace { display: grid; gap: 16px; padding: 20px; }.workspace-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; }.workspace-header h1 { margin: 0 0 4px; font-size: 1.2rem; }.workspace-header p { margin: 0; }.workspace-grid { display: grid; grid-template-columns: minmax(280px, .9fr) minmax(300px, 1.1fr); gap: 16px; }.stack, .panel { display: grid; align-content: start; gap: 10px; }.stack { gap: 16px; }.panel label { color: var(--color-text-muted); font-size: .8rem; }.panel textarea, .panel select, .panel input { width: 100%; box-sizing: border-box; padding: 9px; color: var(--color-text); background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-sm); }.panel pre { max-height: 300px; margin: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 10px; color: var(--color-text); background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: .78rem; }.astro-form { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }.astro-form label { display: grid; gap: 5px; min-width: 150px; }.status-error { margin: 0; color: var(--color-danger); }button { cursor: pointer; }button:disabled { opacity: .55; cursor: not-allowed; }@media (max-width: 800px) { .workspace { padding: 14px; }.workspace-grid { grid-template-columns: 1fr; }.workspace-header { align-items: flex-start; flex-direction: column; } }
+.workspace { display: grid; gap: 16px; padding: 20px; }.workspace-header, .header-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; }.header-actions { flex-wrap: wrap; }.workspace-header h1 { margin: 0 0 4px; font-size: 1.2rem; }.workspace-header p { margin: 0; }.workspace-grid { display: grid; grid-template-columns: minmax(280px, .9fr) minmax(300px, 1.1fr); gap: 16px; }.stack, .panel { display: grid; align-content: start; gap: 10px; }.stack { gap: 16px; }.panel label { color: var(--color-text-muted); font-size: .8rem; }.panel textarea, .panel select, .panel input { width: 100%; box-sizing: border-box; padding: 9px; color: var(--color-text); background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-sm); }.panel pre { max-height: 300px; margin: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 10px; color: var(--color-text); background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: .78rem; }.astro-form { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }.astro-form label { display: grid; gap: 5px; min-width: 150px; }.status-error { margin: 0; color: var(--color-danger); }button { cursor: pointer; }button:disabled { opacity: .55; cursor: not-allowed; }@media (max-width: 800px) { .workspace { padding: 14px; }.workspace-grid { grid-template-columns: 1fr; }.workspace-header { align-items: flex-start; flex-direction: column; } }
 </style>
