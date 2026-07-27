@@ -45,7 +45,15 @@
               <option v-for="option in categoryOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
             </select>
           </label>
+          <label>
+            Skill
+            <select v-model="selectedSkill" :disabled="loading">
+              <option value="">自动选择</option>
+              <option value="astro-shoot-plan">银河拍摄计划</option>
+            </select>
+          </label>
           <div>
+            <button type="button" class="text-button" :disabled="loading" @click="runAstroSample">运行银河拍摄示例</button>
             <button type="button" class="text-button" @click="renameCurrentConversation">重命名</button>
             <button type="button" class="text-button" @click="toggleCurrentPin">{{ currentConversation?.pinned ? '取消置顶' : '置顶' }}</button>
             <button type="button" class="text-button" @click="clearCurrentConversation">清空</button>
@@ -85,7 +93,8 @@ import { useChatStore } from '../../stores/chat'
 import { useMemoryStore } from '../../stores/memory'
 import { useWorkbenchStore } from '../../stores/workbench'
 import { resolveChatSession } from '../../utils/chatSession'
-import { connectToOrchestrator } from '../../services/api'
+import { connectToOrchestrator, executeSkill, previewSkillRoute } from '../../services/api'
+import { astroShootPlanSample, resolveAutoSkill } from '../../utils/conversationalSkill'
 
 const modeOptions = [
   { value: 'normal', label: '普通对话' },
@@ -103,6 +112,7 @@ const loading = ref(false)
 const eventSource = ref(null)
 const messagesContainer = ref(null)
 const lastUserMessage = ref('')
+const selectedSkill = ref('')
 const messages = computed(() => chatStore.assistantAppChats[chatId.value]?.messages || [])
 const conversations = computed(() => Object.values(chatStore.assistantAppChats)
   .sort((left, right) => Number(Boolean(right.pinned)) - Number(Boolean(left.pinned))
@@ -176,7 +186,56 @@ const scrollToBottom = async () => {
   if (messagesContainer.value) messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
 }
 
-const sendMessage = (message) => {
+const formatSkillResult = (result) => {
+  if (typeof result?.data === 'string') return result.data
+  if (result?.data !== undefined && result?.data !== null) return `Skill 执行结果：\n\n\`\`\`json\n${JSON.stringify(result.data, null, 2)}\n\`\`\``
+  return result?.errorMessage || 'Skill 未返回可展示的结果。'
+}
+const runAstroSample = () => {
+  const sample = astroShootPlanSample()
+  selectedSkill.value = sample.name
+  sendMessage('帮我做银河拍摄计划，纬度 39.9042，经度 116.4074，日期 2026-08-15。')
+}
+const executeTriggeredSkill = async (message, manualSkill) => {
+  let trigger = manualSkill ? '手动选择' : '自动触发'
+  let selected = manualSkill
+    ? resolveAutoSkill({ matched: true, selectedSkillNames: [manualSkill] }, message) || astroShootPlanSample()
+    : null
+  if (!selected) {
+    try {
+      selected = resolveAutoSkill(await previewSkillRoute(message), message)
+    } catch {
+      return false
+    }
+  }
+  if (!selected?.name) return false
+
+  const result = await executeSkill(selected.name, selected.arguments)
+  const success = result?.success !== false
+  const label = selected.name === 'astro-shoot-plan' ? '银河拍摄计划' : selected.name
+  const details = [
+    { type: 'skill', label: `${trigger} Skill：${label}` },
+    { type: 'tool', label: '内部工具：银河升起、光污染、云量' }
+  ]
+  chatStore.addMessage(chatId.value, {
+    content: formatSkillResult(result),
+    isUser: false,
+    mode: mode.value,
+    status: success ? 'complete' : 'error',
+    details
+  })
+  workbench.addInvocation({
+    source: 'skill',
+    name: label,
+    status: success ? 'complete' : 'error',
+    summary: `${trigger} Skill${success ? '执行完成' : '执行失败'}：${label}`
+  })
+  loading.value = false
+  scrollToBottom()
+  return true
+}
+
+const sendMessage = async (message) => {
   if (loading.value) return
   const requestMode = mode.value
   lastUserMessage.value = message
@@ -184,6 +243,7 @@ const sendMessage = (message) => {
   loading.value = true
   scrollToBottom()
   try {
+    if (await executeTriggeredSkill(message, selectedSkill.value)) return
     eventSource.value?.close()
     const source = connectToOrchestrator(message, chatId.value)
     eventSource.value = source

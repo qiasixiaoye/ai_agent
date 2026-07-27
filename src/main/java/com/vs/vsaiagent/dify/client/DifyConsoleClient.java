@@ -14,6 +14,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 import java.nio.charset.StandardCharsets;
@@ -40,7 +42,7 @@ public class DifyConsoleClient {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final DifyConsoleProperties props;
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     /** 草稿运行返回 SSE 流（可能长达数十秒），单独用带超时的模板，避免拖死默认模板。 */
     private final RestTemplate streamingRestTemplate = buildStreamingTemplate();
 
@@ -58,7 +60,12 @@ public class DifyConsoleClient {
     }
 
     public DifyConsoleClient(DifyConsoleProperties props) {
+        this(props, new RestTemplate());
+    }
+
+    DifyConsoleClient(DifyConsoleProperties props, RestTemplate restTemplate) {
         this.props = props;
+        this.restTemplate = restTemplate;
     }
 
     public boolean isConfigured() {
@@ -76,7 +83,7 @@ public class DifyConsoleClient {
             return doImport(yamlContent, false);
         } catch (Exception e) {
             log.warn("[dify-console] import failed", e);
-            return DifyImportResult.builder().success(false).errorMessage(e.getMessage()).build();
+            return DifyImportResult.builder().success(false).errorMessage(importFailureMessage(e)).build();
         }
     }
 
@@ -320,6 +327,24 @@ public class DifyConsoleClient {
             base = base.substring(0, base.length() - 1);
         }
         return base + path;
+    }
+
+    private String importFailureMessage(Exception error) {
+        if (error instanceof HttpStatusCodeException httpError) {
+            int status = httpError.getStatusCode().value();
+            if (status == 502 || status == 503 || status == 504) {
+                return "无法连接 Dify 控制台（" + props.getBaseUrl() + "，HTTP " + status
+                        + "）。请确认 Dify Web/API 容器已启动，并检查 app.dify.console.base-url 的网络地址。";
+            }
+            return "Dify 控制台返回 HTTP " + status + "。请检查登录凭据和控制台配置。";
+        }
+        if (error instanceof ResourceAccessException) {
+            return "无法连接 Dify 控制台（" + props.getBaseUrl()
+                    + "）。请确认服务已启动，并检查 app.dify.console.base-url。";
+        }
+        return error.getMessage() == null || error.getMessage().isBlank()
+                ? "Dify 导入失败，请检查控制台配置和运行日志。"
+                : error.getMessage();
     }
 
     private static String truncate(String s) {
